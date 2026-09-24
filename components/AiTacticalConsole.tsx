@@ -15,7 +15,8 @@ import {
   Lock, 
   ExternalLink,
   UserCheck,
-  AlertCircle
+  AlertCircle,
+  Minus
 } from 'lucide-react';
 
 interface Message {
@@ -30,6 +31,7 @@ interface Message {
 interface AiTacticalConsoleProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpen?: () => void;
   models: OllamaModel[];
   selectedModel: string;
   onSelectModel: (model: string) => void;
@@ -39,6 +41,7 @@ interface AiTacticalConsoleProps {
 export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
   isOpen,
   onClose,
+  onOpen,
   models,
   selectedModel,
   onSelectModel,
@@ -84,7 +87,31 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
     },
   ]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return (
+      <div className="fixed bottom-5 right-5 z-50 animate-fadeIn">
+        <button
+          onClick={onOpen || onClose}
+          className="group flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-c2-surface/95 border border-c2-cyan/60 hover:border-c2-cyan shadow-cyan-glow hover:scale-[1.03] transition-all backdrop-blur-xl"
+          title="Open AI Cognition Chat in bottom right corner"
+        >
+          <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-c2-bg border border-c2-cyan/50 text-c2-cyan">
+            <Bot className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-c2-green animate-pulse" />
+          </div>
+          <div className="text-left font-mono">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-white">NEXUS COGNITION</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-c2-cyan/15 text-c2-cyan border border-c2-cyan/30">
+                {selectedModel.split(':')[0]}
+              </span>
+            </div>
+            <span className="text-[10px] text-c2-textMuted block">Click to open chat</span>
+          </div>
+        </button>
+      </div>
+    );
+  }
 
   const handleModelChange = (modelName: string) => {
     onSelectModel(modelName);
@@ -201,7 +228,7 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
   ];
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-full max-w-lg md:max-w-xl bg-c2-surface/95 border border-c2-cyan/50 backdrop-blur-xl rounded-2xl shadow-2xl flex flex-col overflow-hidden h-[600px] max-h-[85vh]">
+    <div className="fixed bottom-5 right-5 z-50 w-[440px] max-w-[calc(100vw-2rem)] h-[580px] max-h-[calc(100vh-5rem)] bg-c2-surface/95 border border-c2-cyan/50 backdrop-blur-xl rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-fadeIn">
       {/* Console Top Header */}
       <div className="p-3.5 bg-c2-bg border-b border-c2-border flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -228,7 +255,7 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* OAuth Status Button */}
           <button
             onClick={() => setIsOAuthModalOpen(true)}
@@ -240,12 +267,21 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
             title="Configure Google OAuth Token for Gemini"
           >
             {oauthStatus.connected ? <UserCheck className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-            <span>{oauthStatus.connected ? 'OAuth Linked' : 'Link OAuth'}</span>
+            <span>{oauthStatus.connected ? 'OAuth' : 'Link OAuth'}</span>
           </button>
 
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-c2-textMuted hover:text-white hover:bg-c2-surface transition-all"
+            title="Minimize to bottom right corner"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-c2-textMuted hover:text-white hover:bg-c2-surface transition-all"
+            title="Close"
           >
             <X className="w-4 h-4" />
           </button>

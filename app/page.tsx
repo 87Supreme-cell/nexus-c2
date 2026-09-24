@@ -314,63 +314,83 @@ export default function CommandCenterPage() {
           </div>
         )}
 
-        {/* TAB WORKSPACE 5: AI COGNITION */}
+        {/* TAB WORKSPACE 5: AI COGNITION & MODELS CATALOG */}
         {activeTab === 'cognition' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
-            <div className="lg:col-span-1 space-y-4">
-              <div className="p-5 rounded-2xl bg-c2-card border border-c2-border">
-                <div className="flex items-center gap-2 mb-3">
+          <div className="space-y-6 animate-fadeIn">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-c2-card border border-c2-border">
+              <div>
+                <div className="flex items-center gap-2">
                   <Bot className="w-5 h-5 text-c2-cyan" />
-                  <h3 className="font-mono font-bold text-sm text-white">COGNITIVE ENGINE SPECS</h3>
+                  <h2 className="font-mono font-bold text-base text-white">AI COGNITION & MODEL REPOSITORY</h2>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-c2-cyan/15 text-c2-cyan border border-c2-cyan/30 font-mono font-bold">
+                    {ollamaModels.length} Models Detected
+                  </span>
                 </div>
-                <p className="text-xs text-c2-textMuted font-mono mb-4 leading-relaxed">
-                  Tactical dual-engine AI. Operates completely air-gapped via local Ollama daemon or routes authorized queries to Google Gemini.
+                <p className="text-xs text-c2-textMuted font-mono mt-1">
+                  Air-gapped local runtimes (Ollama, Apple MLX, LM Studio, Hugging Face) and Google OAuth Gemini 3.8
                 </p>
-
-                <div className="space-y-2 text-xs font-mono">
-                  <div className="p-2.5 rounded-lg bg-c2-surface border border-c2-border flex justify-between items-center">
-                    <span className="text-c2-textMuted">Airgap Status</span>
-                    <span className="text-c2-green font-bold">ACTIVE LOCAL</span>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-c2-surface border border-c2-border flex justify-between items-center">
-                    <span className="text-c2-textMuted">Active Model</span>
-                    <span className="text-c2-cyan font-bold">{selectedModel}</span>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-c2-surface border border-c2-border flex justify-between items-center">
-                    <span className="text-c2-textMuted">Ollama Engine</span>
-                    <span className={ollamaOnline ? 'text-c2-green font-bold' : 'text-c2-red font-bold'}>
-                      {ollamaOnline ? '127.0.0.1:11434 UP' : 'OFFLINE'}
-                    </span>
-                  </div>
-                </div>
               </div>
+
+              <button
+                onClick={() => setIsAiOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-c2-cyan hover:bg-c2-cyan/90 text-c2-bg font-mono font-bold text-xs shadow-cyan-glow transition-all whitespace-nowrap"
+              >
+                <Bot className="w-4 h-4" />
+                <span>OPEN CHAT (BOTTOM RIGHT)</span>
+              </button>
             </div>
 
-            <div className="lg:col-span-2">
-              <AiTacticalConsole
-                isOpen={true}
-                onClose={() => setActiveTab('workspace')}
-                models={ollamaModels}
-                selectedModel={selectedModel}
-                onSelectModel={setSelectedModel}
-                ollamaOnline={ollamaOnline}
-              />
+            {/* Models Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {ollamaModels.map((m) => (
+                <div
+                  key={m.name}
+                  onClick={() => {
+                    setSelectedModel(m.name);
+                    setIsAiOpen(true);
+                  }}
+                  className="p-4 rounded-xl bg-c2-surface border border-c2-border hover:border-c2-cyan/40 hover:bg-c2-surfaceHover transition-all cursor-pointer flex flex-col justify-between group shadow-md"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] font-mono mb-2">
+                      <span className={`px-2 py-0.5 rounded-full font-bold uppercase text-[9px] border ${
+                        m.source === 'ollama' ? 'bg-c2-green/10 text-c2-green border-c2-green/30' :
+                        m.source === 'mlx' ? 'bg-c2-purple/10 text-c2-purple border-c2-purple/30' :
+                        m.source === 'lmstudio' ? 'bg-c2-amber/10 text-c2-amber border-c2-amber/30' :
+                        'bg-c2-cyan/10 text-c2-cyan border-c2-cyan/30'
+                      }`}>
+                        {m.source}
+                      </span>
+                      <span className="text-c2-textMuted">{m.size}</span>
+                    </div>
+
+                    <h4 className="font-mono font-bold text-sm text-white group-hover:text-c2-cyan transition-colors line-clamp-1 mb-1">
+                      {m.name}
+                    </h4>
+                    <p className="text-[11px] font-mono text-c2-textMuted">{m.format || 'Standard Weights'}</p>
+                  </div>
+
+                  <div className="pt-3 border-t border-c2-border/60 flex items-center justify-between text-[10px] font-mono text-c2-cyan mt-3">
+                    <span>Click to chat</span>
+                    <span>→</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
       </main>
 
-      {/* Floating Tactical AI Copilot (when toggled from HUD in any other tab) */}
-      {activeTab !== 'cognition' && (
-        <AiTacticalConsole
-          isOpen={isAiOpen}
-          onClose={() => setIsAiOpen(false)}
-          models={ollamaModels}
-          selectedModel={selectedModel}
-          onSelectModel={setSelectedModel}
-          ollamaOnline={ollamaOnline}
-        />
-      )}
+      {/* Floating Tactical AI Copilot (Always pinned to bottom-right corner) */}
+      <AiTacticalConsole
+        isOpen={isAiOpen}
+        onClose={() => setIsAiOpen(false)}
+        onOpen={() => setIsAiOpen(true)}
+        models={ollamaModels}
+        selectedModel={selectedModel}
+        onSelectModel={setSelectedModel}
+        ollamaOnline={ollamaOnline}
+      />
 
       {/* Register Custom App Modal */}
       <AddAppModal
