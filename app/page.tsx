@@ -246,7 +246,13 @@ export default function CommandCenterPage() {
         onOpenConnectModal={() => setIsConnectModalOpen(true)}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main
+        className={`transition-all duration-300 px-4 pt-6 ${
+          isAiOpen
+            ? 'max-w-7xl mx-auto xl:max-w-none xl:mr-[440px] xl:ml-6 pb-[560px] xl:pb-16'
+            : 'max-w-7xl mx-auto pb-24'
+        }`}
+      >
         {/* Compact Telemetry & Status Ribbon */}
         <KpiTelemetry
           telemetry={telemetry}

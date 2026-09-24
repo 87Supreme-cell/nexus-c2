@@ -157,8 +157,22 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
           })}
         </nav>
 
-        {/* Right: Connect Account & Antigravity Launcher */}
+        {/* Right: Connect Account, AI Copilot & Antigravity Launcher */}
         <div className="flex items-center gap-2">
+          {/* AI Copilot Toggle Button */}
+          <button
+            onClick={onToggleAi}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all border ${
+              isAiOpen
+                ? 'bg-c2-cyan text-c2-bg border-c2-cyan shadow-cyan-glow'
+                : 'bg-c2-surface border-c2-border text-c2-textMuted hover:text-white hover:border-c2-cyan/50'
+            }`}
+            title="Toggle Tactical AI Chat (Bottom Right Corner)"
+          >
+            <Bot className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{isAiOpen ? 'HIDE AI' : 'AI COPILOT'}</span>
+          </button>
+
           {/* Quick Connect Account Button */}
           <button
             onClick={onOpenConnectModal}

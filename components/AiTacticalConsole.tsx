@@ -16,7 +16,10 @@ import {
   ExternalLink,
   UserCheck,
   AlertCircle,
-  Minus
+  Minus,
+  ChevronUp,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 
 interface Message {
@@ -53,6 +56,10 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
   const [loading, setLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
+  // Layout View States (Minimize & Expand Height)
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
   // Google OAuth State
   const [oauthStatus, setOauthStatus] = useState<{
     connected: boolean;
@@ -87,28 +94,62 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
     },
   ]);
 
+  // CLOSED STATE: Compact, unobtrusive floating button in bottom right corner
   if (!isOpen) {
     return (
-      <div className="fixed bottom-5 right-5 z-50 animate-fadeIn">
+      <div className="fixed bottom-4 right-4 z-40 animate-fadeIn">
         <button
           onClick={onOpen || onClose}
-          className="group flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-c2-surface/95 border border-c2-cyan/60 hover:border-c2-cyan shadow-cyan-glow hover:scale-[1.03] transition-all backdrop-blur-xl"
-          title="Open AI Cognition Chat in bottom right corner"
+          className="group flex items-center gap-2.5 px-3 py-2 rounded-xl bg-c2-surface/90 border border-c2-cyan/50 hover:border-c2-cyan shadow-cyan-glow hover:scale-[1.02] transition-all backdrop-blur-xl font-mono text-xs"
+          title="Open AI Tactical Console (Bottom Right Corner)"
         >
-          <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-c2-bg border border-c2-cyan/50 text-c2-cyan">
-            <Bot className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-c2-green animate-pulse" />
+          <div className="relative flex items-center justify-center w-6 h-6 rounded-lg bg-c2-bg border border-c2-cyan/50 text-c2-cyan">
+            <Bot className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
+            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-c2-green animate-pulse" />
           </div>
-          <div className="text-left font-mono">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-white">NEXUS COGNITION</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-c2-cyan/15 text-c2-cyan border border-c2-cyan/30">
-                {selectedModel.split(':')[0]}
-              </span>
-            </div>
-            <span className="text-[10px] text-c2-textMuted block">Click to open chat</span>
+          <div className="flex items-center gap-1.5 text-left">
+            <span className="font-bold text-white">AI CHAT</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-c2-cyan/15 text-c2-cyan border border-c2-cyan/30 hidden sm:inline">
+              {selectedModel.split(':')[0]}
+            </span>
           </div>
         </button>
+      </div>
+    );
+  }
+
+  // MINIMIZED STATE: 40px ultra-slim bar in bottom right corner
+  if (isMinimized) {
+    return (
+      <div className="fixed bottom-4 right-4 z-50 animate-fadeIn">
+        <div className="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-c2-surface/95 border border-c2-cyan/60 backdrop-blur-xl shadow-cyan-glow font-mono text-xs">
+          <div className="relative flex items-center justify-center w-6 h-6 rounded-lg bg-c2-bg border border-c2-cyan/50 text-c2-cyan">
+            <Bot className="w-3.5 h-3.5" />
+            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-c2-green animate-pulse" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-white">NEXUS AI</span>
+            <span className="text-[10px] text-c2-cyan px-1.5 py-0.5 rounded bg-c2-cyan/15 border border-c2-cyan/30">
+              {selectedModel.split(':')[0]}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 border-l border-c2-border/80 pl-2">
+            <button
+              onClick={() => setIsMinimized(false)}
+              className="p-1 rounded text-c2-textMuted hover:text-white hover:bg-c2-surfaceHover transition-all"
+              title="Expand Chat Window"
+            >
+              <ChevronUp className="w-4 h-4 text-c2-cyan" />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1 rounded text-c2-textMuted hover:text-white hover:bg-c2-surfaceHover transition-all"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -228,38 +269,40 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
   ];
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 w-[440px] max-w-[calc(100vw-2rem)] h-[580px] max-h-[calc(100vh-5rem)] bg-c2-surface/95 border border-c2-cyan/50 backdrop-blur-xl rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-fadeIn">
+    <div className={`fixed bottom-4 right-4 z-50 w-[420px] max-w-[calc(100vw-2rem)] ${
+      isExpanded ? 'h-[660px]' : 'h-[520px]'
+    } max-h-[calc(100vh-5rem)] bg-c2-surface/95 border border-c2-cyan/50 backdrop-blur-xl rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-fadeIn`}>
       {/* Console Top Header */}
-      <div className="p-3.5 bg-c2-bg border-b border-c2-border flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-c2-cyan/10 border border-c2-cyan/30 text-c2-cyan">
-            <Bot className="w-5 h-5 animate-pulse" />
+      <div className="p-3 bg-c2-bg border-b border-c2-border flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-c2-cyan/10 border border-c2-cyan/30 text-c2-cyan">
+            <Bot className="w-4 h-4 animate-pulse" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-mono font-bold text-sm text-white">NEXUS AI COGNITION</h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-mono font-bold text-xs text-white">NEXUS COGNITION</h3>
               {provider === 'gemini' ? (
                 <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold bg-c2-purple/15 text-c2-purple border border-c2-purple/30 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  {oauthStatus.connected ? 'GEMINI (OAUTH 2.0)' : 'GEMINI (AUTH REQUIRED)'}
+                  <Sparkles className="w-2.5 h-2.5" />
+                  {oauthStatus.connected ? 'OAUTH 2.0' : 'AUTH REQ'}
                 </span>
               ) : (
                 <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold bg-c2-green/15 text-c2-green border border-c2-green/30 flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> LOCAL AIRGAP
+                  <ShieldCheck className="w-2.5 h-2.5" /> AIRGAP
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-c2-textMuted font-mono">
-              Dual-Engine: 19 Local Models + Google OAuth Gemini
+            <p className="text-[9px] text-c2-textMuted font-mono">
+              Dual-Engine: 19 Local Models + Gemini
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           {/* OAuth Status Button */}
           <button
             onClick={() => setIsOAuthModalOpen(true)}
-            className={`px-2 py-1 rounded text-[10px] font-mono font-bold flex items-center gap-1 border transition-all ${
+            className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold flex items-center gap-1 border transition-all ${
               oauthStatus.connected
                 ? 'bg-c2-green/10 border-c2-green/30 text-c2-green'
                 : 'bg-c2-amber/10 border-c2-amber/30 text-c2-amber hover:bg-c2-amber/20'
@@ -270,20 +313,31 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
             <span>{oauthStatus.connected ? 'OAuth' : 'Link OAuth'}</span>
           </button>
 
+          {/* Minimize to bottom right dock bar */}
           <button
-            onClick={onClose}
+            onClick={() => setIsMinimized(true)}
             className="p-1.5 rounded-lg text-c2-textMuted hover:text-white hover:bg-c2-surface transition-all"
-            title="Minimize to bottom right corner"
+            title="Minimize to compact bar"
           >
-            <Minus className="w-4 h-4" />
+            <Minus className="w-3.5 h-3.5" />
           </button>
 
+          {/* Height Expand/Compact toggle */}
+          <button
+            onClick={() => setIsExpanded((prev) => !prev)}
+            className="p-1.5 rounded-lg text-c2-textMuted hover:text-white hover:bg-c2-surface transition-all"
+            title={isExpanded ? 'Compact height' : 'Expand height'}
+          >
+            {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
+
+          {/* Close */}
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-c2-textMuted hover:text-white hover:bg-c2-surface transition-all"
             title="Close"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
