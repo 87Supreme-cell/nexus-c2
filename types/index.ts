@@ -104,3 +104,5 @@ export interface SystemTelemetry {
 }
 
 export type ViewMode = 'tactical-c2' | 'cyber-glass' | 'google-ops';
+
+export type TabSpace = 'workspace' | 'apps' | 'goals' | 'docker' | 'cognition';

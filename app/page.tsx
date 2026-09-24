@@ -10,7 +10,7 @@ import {
   GoogleTaskItem, 
   GmailAlert, 
   SystemTelemetry, 
-  ViewMode 
+  TabSpace 
 } from '@/types';
 import { HeaderHUD } from '@/components/HeaderHUD';
 import { KpiTelemetry } from '@/components/KpiTelemetry';
@@ -20,12 +20,16 @@ import { GoalTracker } from '@/components/GoalTracker';
 import { DockerManager } from '@/components/DockerManager';
 import { AiTacticalConsole } from '@/components/AiTacticalConsole';
 import { AddAppModal } from '@/components/AddAppModal';
+import { GoogleConnectModal } from '@/components/GoogleConnectModal';
 import { INITIAL_GOALS, INITIAL_CALENDAR_EVENTS, INITIAL_GOOGLE_TASKS, INITIAL_GMAIL_ALERTS } from '@/lib/goals-data';
+import { GoogleAccountConfig } from '@/lib/google-calendar-service';
+import { Sparkles, Bot, Calendar, Grid, Target, Boxes } from 'lucide-react';
 
 export default function CommandCenterPage() {
-  const [viewMode, setViewMode] = useState<ViewMode>('tactical-c2');
+  const [activeTab, setActiveTab] = useState<TabSpace>('workspace');
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [isAddAppOpen, setIsAddAppOpen] = useState(false);
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
 
   // Core Data States
   const [apps, setApps] = useState<AppItem[]>([]);
@@ -38,11 +42,11 @@ export default function CommandCenterPage() {
   const [selectedModel, setSelectedModel] = useState<string>('qwen2.5-coder:7b');
   const [ollamaOnline, setOllamaOnline] = useState<boolean>(true);
 
-  // Google Workspace Data
+  // Google Workspace Data & Account
   const [calendarEvents, setCalendarEvents] = useState<GoogleCalendarEvent[]>(INITIAL_CALENDAR_EVENTS);
   const [tasks, setTasks] = useState<GoogleTaskItem[]>(INITIAL_GOOGLE_TASKS);
   const [alerts, setAlerts] = useState<GmailAlert[]>(INITIAL_GMAIL_ALERTS);
-  const [oauthConfigured, setOauthConfigured] = useState<boolean>(false);
+  const [account, setAccount] = useState<GoogleAccountConfig | null>(null);
 
   // Goals
   const [goals, setGoals] = useState<GoalItem[]>(INITIAL_GOALS);
@@ -107,10 +111,26 @@ export default function CommandCenterPage() {
           }
         }
       }
-    } catch (err) {
+    } catch {
       setOllamaOnline(false);
     }
   }, [selectedModel]);
+
+  // Fetch Google Account & Calendar
+  const fetchGoogleData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/google');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.account) setAccount(data.account);
+        if (data.events && data.events.length > 0) setCalendarEvents(data.events);
+        if (data.tasks) setTasks(data.tasks);
+        if (data.alerts) setAlerts(data.alerts);
+      }
+    } catch (err) {
+      console.error('Failed fetching Google data:', err);
+    }
+  }, []);
 
   // Initial Data Load
   useEffect(() => {
@@ -118,6 +138,7 @@ export default function CommandCenterPage() {
     fetchApps();
     fetchDocker();
     fetchOllama();
+    fetchGoogleData();
 
     const interval = setInterval(() => {
       fetchTelemetry();
@@ -125,7 +146,7 @@ export default function CommandCenterPage() {
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [fetchTelemetry, fetchApps, fetchDocker, fetchOllama]);
+  }, [fetchTelemetry, fetchApps, fetchDocker, fetchOllama, fetchGoogleData]);
 
   // Milestone toggle handler
   const handleToggleMilestone = (goalId: string, milestoneId: string) => {
@@ -143,62 +164,90 @@ export default function CommandCenterPage() {
   };
 
   // Google Task add handler
-  const handleAddTask = (title: string) => {
-    const newTask: GoogleTaskItem = {
-      id: `t-${Date.now()}`,
-      title,
-      due: 'Today',
-      completed: false,
-    };
-    setTasks((prev) => [newTask, ...prev]);
+  const handleAddTask = async (title: string) => {
+    try {
+      const res = await fetch('/api/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add-task', item: { title } }),
+      });
+      const data = await res.json();
+      if (data.task) {
+        setTasks((prev) => [data.task, ...prev]);
+      }
+    } catch {
+      const fallback: GoogleTaskItem = {
+        id: `t-${Date.now()}`,
+        title,
+        due: 'Today',
+        completed: false,
+      };
+      setTasks((prev) => [fallback, ...prev]);
+    }
   };
 
   // Google Event add handler
-  const handleAddEvent = (title: string, startTime: string) => {
-    const newEvent: GoogleCalendarEvent = {
-      id: `ev-${Date.now()}`,
-      title,
-      startTime,
-      endTime: `${parseInt(startTime.split(':')[0], 10) + 1}:00`,
-      status: 'confirmed',
-      link: 'https://calendar.google.com/',
-    };
-    setCalendarEvents((prev) => [newEvent, ...prev]);
+  const handleAddEvent = async (title: string, startTime: string) => {
+    try {
+      const res = await fetch('/api/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add-event', item: { title, startTime } }),
+      });
+      const data = await res.json();
+      if (data.events) {
+        setCalendarEvents(data.events);
+      }
+    } catch {
+      const fallback: GoogleCalendarEvent = {
+        id: `ev-${Date.now()}`,
+        title,
+        startTime,
+        endTime: `${parseInt(startTime.split(':')[0], 10) + 1}:00`,
+        status: 'confirmed',
+        link: 'https://calendar.google.com/',
+      };
+      setCalendarEvents((prev) => [fallback, ...prev]);
+    }
   };
 
-  // Compute overall goal velocity
+  const handleDeleteEvent = async (eventId: string) => {
+    try {
+      const res = await fetch('/api/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete-event', eventId }),
+      });
+      const data = await res.json();
+      if (data.events) {
+        setCalendarEvents(data.events);
+      }
+    } catch {
+      setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
+    }
+  };
+
   const overallGoalProgress = Math.round(
     goals.reduce((acc, curr) => acc + curr.progress, 0) / (goals.length || 1)
   );
 
   const onlineAppsCount = apps.filter((a) => a.status === 'online').length;
 
-  const getBackgroundClass = () => {
-    switch (viewMode) {
-      case 'tactical-c2':
-        return 'bg-tactical-grid';
-      case 'cyber-glass':
-        return 'bg-glass-grid';
-      case 'google-ops':
-        return 'bg-google-grid';
-      default:
-        return 'bg-tactical-grid';
-    }
-  };
-
   return (
-    <div className={`min-h-screen text-slate-100 ${getBackgroundClass()} transition-colors duration-500`}>
-      {/* Top Tactical HUD Header */}
+    <div className="min-h-screen bg-c2-bg text-slate-100 bg-tactical-grid transition-colors">
+      {/* Top Tactical HUD Header with Clean Navigation Tabs */}
       <HeaderHUD
-        viewMode={viewMode}
-        setViewMode={setViewMode}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
         onToggleAi={() => setIsAiOpen((prev) => !prev)}
         isAiOpen={isAiOpen}
         selectedModel={selectedModel}
+        account={account}
+        onOpenConnectModal={() => setIsConnectModalOpen(true)}
       />
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* KPI Telemetry Banner */}
+        {/* Compact Telemetry & Status Ribbon */}
         <KpiTelemetry
           telemetry={telemetry}
           totalAppsCount={apps.length}
@@ -206,83 +255,136 @@ export default function CommandCenterPage() {
           overallGoalProgress={overallGoalProgress}
         />
 
-        {/* View-Specific Arrangements */}
-        {viewMode === 'google-ops' ? (
-          <>
-            {/* Google Ops priority order */}
+        {/* TAB WORKSPACE 1: GOOGLE WORKSPACE (Dedicated Clean View) */}
+        {activeTab === 'workspace' && (
+          <div className="space-y-6 animate-fadeIn">
             <GoogleWorkspaceHub
               events={calendarEvents}
               tasks={tasks}
               alerts={alerts}
+              account={account}
               onAddTask={handleAddTask}
               onAddEvent={handleAddEvent}
-              oauthConfigured={oauthConfigured}
+              onDeleteEvent={handleDeleteEvent}
+              onOpenConnectModal={() => setIsConnectModalOpen(true)}
+              onRefreshCalendar={fetchGoogleData}
             />
+          </div>
+        )}
+
+        {/* TAB WORKSPACE 2: APPS & RUNTIMES */}
+        {activeTab === 'apps' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-mono font-bold text-base text-white">MANAGED APPLICATIONS & RUNTIMES</h2>
+                <p className="text-xs text-c2-textMuted font-mono">
+                  Supervise local microservices, Docker workloads, and detected Chrome web apps
+                </p>
+              </div>
+            </div>
+
             <AppGrid
               apps={apps}
               onRefresh={fetchApps}
               onOpenAddModal={() => setIsAddAppOpen(true)}
               isLoading={isLoadingApps}
             />
+          </div>
+        )}
+
+        {/* TAB WORKSPACE 3: MISSION GOALS */}
+        {activeTab === 'goals' && (
+          <div className="space-y-6 animate-fadeIn">
             <GoalTracker
               goals={goals}
               onToggleMilestone={handleToggleMilestone}
             />
+          </div>
+        )}
+
+        {/* TAB WORKSPACE 4: DOCKER CLUSTER */}
+        {activeTab === 'docker' && (
+          <div className="space-y-6 animate-fadeIn">
             <DockerManager
               containers={dockerData.containers}
               dockerRunning={dockerData.dockerRunning}
               onRefresh={fetchDocker}
             />
-          </>
-        ) : (
-          <>
-            {/* Tactical C2 and Cyber Glass default order */}
-            <AppGrid
-              apps={apps}
-              onRefresh={fetchApps}
-              onOpenAddModal={() => setIsAddAppOpen(true)}
-              isLoading={isLoadingApps}
-            />
+          </div>
+        )}
 
-            <GoogleWorkspaceHub
-              events={calendarEvents}
-              tasks={tasks}
-              alerts={alerts}
-              onAddTask={handleAddTask}
-              onAddEvent={handleAddEvent}
-              oauthConfigured={oauthConfigured}
-            />
+        {/* TAB WORKSPACE 5: AI COGNITION */}
+        {activeTab === 'cognition' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
+            <div className="lg:col-span-1 space-y-4">
+              <div className="p-5 rounded-2xl bg-c2-card border border-c2-border">
+                <div className="flex items-center gap-2 mb-3">
+                  <Bot className="w-5 h-5 text-c2-cyan" />
+                  <h3 className="font-mono font-bold text-sm text-white">COGNITIVE ENGINE SPECS</h3>
+                </div>
+                <p className="text-xs text-c2-textMuted font-mono mb-4 leading-relaxed">
+                  Tactical dual-engine AI. Operates completely air-gapped via local Ollama daemon or routes authorized queries to Google Gemini.
+                </p>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <GoalTracker
-                goals={goals}
-                onToggleMilestone={handleToggleMilestone}
-              />
-              <DockerManager
-                containers={dockerData.containers}
-                dockerRunning={dockerData.dockerRunning}
-                onRefresh={fetchDocker}
+                <div className="space-y-2 text-xs font-mono">
+                  <div className="p-2.5 rounded-lg bg-c2-surface border border-c2-border flex justify-between items-center">
+                    <span className="text-c2-textMuted">Airgap Status</span>
+                    <span className="text-c2-green font-bold">ACTIVE LOCAL</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-c2-surface border border-c2-border flex justify-between items-center">
+                    <span className="text-c2-textMuted">Active Model</span>
+                    <span className="text-c2-cyan font-bold">{selectedModel}</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-c2-surface border border-c2-border flex justify-between items-center">
+                    <span className="text-c2-textMuted">Ollama Engine</span>
+                    <span className={ollamaOnline ? 'text-c2-green font-bold' : 'text-c2-red font-bold'}>
+                      {ollamaOnline ? '127.0.0.1:11434 UP' : 'OFFLINE'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2">
+              <AiTacticalConsole
+                isOpen={true}
+                onClose={() => setActiveTab('workspace')}
+                models={ollamaModels}
+                selectedModel={selectedModel}
+                onSelectModel={setSelectedModel}
+                ollamaOnline={ollamaOnline}
               />
             </div>
-          </>
+          </div>
         )}
       </main>
 
-      {/* Embedded Tactical AI Copilot Console */}
-      <AiTacticalConsole
-        isOpen={isAiOpen}
-        onClose={() => setIsAiOpen(false)}
-        models={ollamaModels}
-        selectedModel={selectedModel}
-        onSelectModel={setSelectedModel}
-        ollamaOnline={ollamaOnline}
-      />
+      {/* Floating Tactical AI Copilot (when toggled from HUD in any other tab) */}
+      {activeTab !== 'cognition' && (
+        <AiTacticalConsole
+          isOpen={isAiOpen}
+          onClose={() => setIsAiOpen(false)}
+          models={ollamaModels}
+          selectedModel={selectedModel}
+          onSelectModel={setSelectedModel}
+          ollamaOnline={ollamaOnline}
+        />
+      )}
 
       {/* Register Custom App Modal */}
       <AddAppModal
         isOpen={isAddAppOpen}
         onClose={() => setIsAddAppOpen(false)}
         onAppAdded={fetchApps}
+      />
+
+      {/* Connect Google Account Modal */}
+      <GoogleConnectModal
+        isOpen={isConnectModalOpen}
+        onClose={() => setIsConnectModalOpen(false)}
+        account={account}
+        onAccountUpdated={fetchGoogleData}
       />
     </div>
   );
