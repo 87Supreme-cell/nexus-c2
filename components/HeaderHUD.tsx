@@ -15,7 +15,9 @@ import {
   Link,
   UserCheck,
   Download,
-  Laptop
+  Laptop,
+  LayoutDashboard,
+  ShieldCheck
 } from 'lucide-react';
 import { GoogleAccountConfig } from '@/lib/google-calendar-service';
 
@@ -126,11 +128,13 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
   };
 
   const TABS: { id: TabSpace; label: string; icon: React.ElementType; badge?: string }[] = [
+    { id: 'dashboard', label: 'C2 Overview', icon: LayoutDashboard },
     { id: 'workspace', label: 'Google Workspace', icon: Calendar, badge: account?.connected ? 'Linked' : undefined },
     { id: 'apps', label: 'App Launcher', icon: Grid },
+    { id: 'cognition', label: 'AI Cognition', icon: Bot },
+    { id: 'security', label: 'Pen-Test & Sec', icon: ShieldCheck, badge: 'A+' },
     { id: 'goals', label: 'Mission Objectives', icon: Target },
     { id: 'docker', label: 'Docker Cluster', icon: Boxes },
-    { id: 'cognition', label: 'AI Cognition', icon: Bot },
   ];
 
   return (

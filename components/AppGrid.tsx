@@ -19,6 +19,7 @@ interface AppGridProps {
   onRefresh: () => void;
   onOpenAddModal: () => void;
   isLoading: boolean;
+  onOpenInApp?: (app: AppItem) => void;
 }
 
 const CATEGORIES: { label: string; value: AppCategory; icon: React.ElementType }[] = [
@@ -34,6 +35,7 @@ export const AppGrid: React.FC<AppGridProps> = ({
   onRefresh,
   onOpenAddModal,
   isLoading,
+  onOpenInApp,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<AppCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -115,7 +117,7 @@ export const AppGrid: React.FC<AppGridProps> = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredApps.map((app) => (
-            <AppCard key={app.id} app={app} onRefresh={onRefresh} />
+            <AppCard key={app.id} app={app} onRefresh={onRefresh} onOpenInApp={onOpenInApp} />
           ))}
         </div>
       )}

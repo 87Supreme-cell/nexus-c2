@@ -10,7 +10,9 @@ import {
   GoogleTaskItem, 
   GmailAlert, 
   SystemTelemetry, 
-  TabSpace 
+  TabSpace,
+  AiAnalysisReport,
+  AnalysisDomain
 } from '@/types';
 import { HeaderHUD } from '@/components/HeaderHUD';
 import { KpiTelemetry } from '@/components/KpiTelemetry';
@@ -21,12 +23,18 @@ import { DockerManager } from '@/components/DockerManager';
 import { AiTacticalConsole } from '@/components/AiTacticalConsole';
 import { AddAppModal } from '@/components/AddAppModal';
 import { GoogleConnectModal } from '@/components/GoogleConnectModal';
+import { TacticalDashboard } from '@/components/TacticalDashboard';
+import { TacticalAnalysisModal } from '@/components/TacticalAnalysisModal';
+import { EmbeddedAppWorkspace } from '@/components/EmbeddedAppWorkspace';
+import { PenTestSecurityPanel } from '@/components/PenTestSecurityPanel';
 import { INITIAL_GOALS, INITIAL_CALENDAR_EVENTS, INITIAL_GOOGLE_TASKS, INITIAL_GMAIL_ALERTS } from '@/lib/goals-data';
 import { GoogleAccountConfig } from '@/lib/google-calendar-service';
-import { Sparkles, Bot, Calendar, Grid, Target, Boxes } from 'lucide-react';
+import { DriveDocumentItem } from '@/lib/google-drive-bridge';
+import { Sparkles, Bot, Calendar, Grid, Target, Boxes, ShieldCheck } from 'lucide-react';
 
 export default function CommandCenterPage() {
-  const [activeTab, setActiveTab] = useState<TabSpace>('workspace');
+  // Primary Landing Page is 'dashboard' (C2 Overview with 3D HoloSphere & Large KPI Cards)
+  const [activeTab, setActiveTab] = useState<TabSpace>('dashboard');
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [isAddAppOpen, setIsAddAppOpen] = useState(false);
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
@@ -39,14 +47,24 @@ export default function CommandCenterPage() {
     containers: [],
   });
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>('qwen2.5-coder:7b');
+  // Default selected model is Gemini 3.8 Flash (Active Google OAuth Session)
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.8-flash');
   const [ollamaOnline, setOllamaOnline] = useState<boolean>(true);
 
-  // Google Workspace Data & Account
+  // Google Workspace Data & Drive Files
   const [calendarEvents, setCalendarEvents] = useState<GoogleCalendarEvent[]>(INITIAL_CALENDAR_EVENTS);
   const [tasks, setTasks] = useState<GoogleTaskItem[]>(INITIAL_GOOGLE_TASKS);
   const [alerts, setAlerts] = useState<GmailAlert[]>(INITIAL_GMAIL_ALERTS);
   const [account, setAccount] = useState<GoogleAccountConfig | null>(null);
+  const [driveFiles, setDriveFiles] = useState<DriveDocumentItem[]>([]);
+
+  // In-App Embedded Workspace Active App
+  const [activeEmbeddedApp, setActiveEmbeddedApp] = useState<AppItem | null>(null);
+
+  // 1-Click AI Analysis State
+  const [analysisReport, setAnalysisReport] = useState<AiAnalysisReport | null>(null);
+  const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Goals
   const [goals, setGoals] = useState<GoalItem[]>(INITIAL_GOALS);
@@ -97,7 +115,7 @@ export default function CommandCenterPage() {
     }
   }, []);
 
-  // Fetch Ollama models
+  // Fetch Ollama models without stomping selected model
   const fetchOllama = useCallback(async () => {
     try {
       const res = await fetch('/api/ollama');
@@ -106,15 +124,12 @@ export default function CommandCenterPage() {
         setOllamaOnline(data.online);
         if (data.models && data.models.length > 0) {
           setOllamaModels(data.models);
-          if (!selectedModel || !data.models.some((m: any) => m.name === selectedModel)) {
-            setSelectedModel(data.models[0].name);
-          }
         }
       }
     } catch {
       setOllamaOnline(false);
     }
-  }, [selectedModel]);
+  }, []);
 
   // Fetch Google Account & Calendar
   const fetchGoogleData = useCallback(async () => {
@@ -132,6 +147,42 @@ export default function CommandCenterPage() {
     }
   }, []);
 
+  // Fetch Google Drive synced files
+  const fetchDriveFiles = useCallback(async () => {
+    try {
+      const res = await fetch('/api/google/drive');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.files && Array.isArray(data.files)) {
+          setDriveFiles(data.files);
+        }
+      }
+    } catch (err) {
+      console.error('Failed fetching Drive files:', err);
+    }
+  }, []);
+
+  // 1-Click AI Synthesis Trigger
+  const handleTriggerAnalysis = async (domain: AnalysisDomain) => {
+    setIsAnalyzing(true);
+    try {
+      const res = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, model: selectedModel }),
+      });
+      const data = await res.json();
+      if (data.success && data.report) {
+        setAnalysisReport(data.report);
+        setIsAnalysisModalOpen(true);
+      }
+    } catch (err) {
+      console.error('1-Click Analysis request failed:', err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   // Initial Data Load
   useEffect(() => {
     fetchTelemetry();
@@ -139,6 +190,7 @@ export default function CommandCenterPage() {
     fetchDocker();
     fetchOllama();
     fetchGoogleData();
+    fetchDriveFiles();
 
     const interval = setInterval(() => {
       fetchTelemetry();
@@ -146,7 +198,7 @@ export default function CommandCenterPage() {
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [fetchTelemetry, fetchApps, fetchDocker, fetchOllama, fetchGoogleData]);
+  }, [fetchTelemetry, fetchApps, fetchDocker, fetchOllama, fetchGoogleData, fetchDriveFiles]);
 
   // Milestone toggle handler
   const handleToggleMilestone = (goalId: string, milestoneId: string) => {
@@ -261,7 +313,25 @@ export default function CommandCenterPage() {
           overallGoalProgress={overallGoalProgress}
         />
 
-        {/* TAB WORKSPACE 1: GOOGLE WORKSPACE (Dedicated Clean View) */}
+        {/* TAB WORKSPACE 0: LANDING PAGE C2 OVERVIEW (Hero 3D HoloSphere & Large KPI Cards) */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6 animate-fadeIn">
+            <TacticalDashboard
+              telemetry={telemetry}
+              account={account}
+              calendarEvents={calendarEvents}
+              driveFiles={driveFiles}
+              models={ollamaModels}
+              selectedModel={selectedModel}
+              onNavigateTab={setActiveTab}
+              onOpenAiChat={() => setIsAiOpen(true)}
+              onTriggerAnalysis={handleTriggerAnalysis}
+              isAnalyzing={isAnalyzing}
+            />
+          </div>
+        )}
+
+        {/* TAB WORKSPACE 1: GOOGLE WORKSPACE */}
         {activeTab === 'workspace' && (
           <div className="space-y-6 animate-fadeIn">
             <GoogleWorkspaceHub
@@ -278,14 +348,14 @@ export default function CommandCenterPage() {
           </div>
         )}
 
-        {/* TAB WORKSPACE 2: APPS & RUNTIMES */}
+        {/* TAB WORKSPACE 2: APPS & RUNTIMES (WITH IN-APP WORKSPACE CAPABILITY) */}
         {activeTab === 'apps' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-mono font-bold text-base text-white">MANAGED APPLICATIONS & RUNTIMES</h2>
+                <h2 className="font-mono font-bold text-base text-white">MANAGED APPLICATIONS &amp; RUNTIMES</h2>
                 <p className="text-xs text-c2-textMuted font-mono">
-                  Supervise local microservices, Docker workloads, and detected Chrome web apps
+                  Supervise local microservices, Docker workloads, and detected Chrome web apps with native in-app view
                 </p>
               </div>
             </div>
@@ -295,32 +365,12 @@ export default function CommandCenterPage() {
               onRefresh={fetchApps}
               onOpenAddModal={() => setIsAddAppOpen(true)}
               isLoading={isLoadingApps}
+              onOpenInApp={(app) => setActiveEmbeddedApp(app)}
             />
           </div>
         )}
 
-        {/* TAB WORKSPACE 3: MISSION GOALS */}
-        {activeTab === 'goals' && (
-          <div className="space-y-6 animate-fadeIn">
-            <GoalTracker
-              goals={goals}
-              onToggleMilestone={handleToggleMilestone}
-            />
-          </div>
-        )}
-
-        {/* TAB WORKSPACE 4: DOCKER CLUSTER */}
-        {activeTab === 'docker' && (
-          <div className="space-y-6 animate-fadeIn">
-            <DockerManager
-              containers={dockerData.containers}
-              dockerRunning={dockerData.dockerRunning}
-              onRefresh={fetchDocker}
-            />
-          </div>
-        )}
-
-        {/* TAB WORKSPACE 5: AI COGNITION & MODELS CATALOG */}
+        {/* TAB WORKSPACE 3: AI COGNITION & MODELS CATALOG */}
         {activeTab === 'cognition' && (
           <div className="space-y-6 animate-fadeIn">
             {/* Top Operational Status Banner */}
@@ -339,13 +389,23 @@ export default function CommandCenterPage() {
                 </p>
               </div>
 
-              <button
-                onClick={() => setIsAiOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-c2-cyan hover:bg-c2-cyan/90 text-c2-bg font-mono font-bold text-xs shadow-cyan-glow transition-all whitespace-nowrap"
-              >
-                <Bot className="w-4 h-4" />
-                <span>OPEN CHAT CONSOLE</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleTriggerAnalysis('cognition')}
+                  disabled={isAnalyzing}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-c2-purple/15 hover:bg-c2-purple/25 border border-c2-purple/40 text-c2-purple font-mono font-bold text-xs transition-all"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>1-CLICK BENCHMARK</span>
+                </button>
+                <button
+                  onClick={() => setIsAiOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-c2-cyan hover:bg-c2-cyan/90 text-c2-bg font-mono font-bold text-xs shadow-cyan-glow transition-all whitespace-nowrap"
+                >
+                  <Bot className="w-4 h-4" />
+                  <span>OPEN CHAT CONSOLE</span>
+                </button>
+              </div>
             </div>
 
             {/* SECTION 1: GOOGLE GEMINI CLOUD (OAUTH LINKED) */}
@@ -440,7 +500,7 @@ export default function CommandCenterPage() {
                   </span>
                 </div>
                 <span className="text-[10px] font-mono text-c2-green font-bold">
-                  ZERO-EGRESS AIRGAP
+                  ZERO-EGRESS AIRGAP (NO OAUTH REQUIRED)
                 </span>
               </div>
 
@@ -449,8 +509,9 @@ export default function CommandCenterPage() {
                   const isSelected = selectedModel === m.name;
                   let role = 'GENERAL INFERENCE';
                   if (m.name.includes('coder')) role = 'CODE SPECIALIST';
-                  else if (m.name.includes('r1')) role = 'DEEP REASONING';
-                  else if (m.name.includes('gemma')) role = 'ASSISTANT';
+                  else if (m.name.includes('r1')) role = 'REASONING (CoT)';
+                  else if (m.name.includes('gemma')) role = 'GOOGLE INSTRUCTION';
+                  else if (m.name.includes('bonsai')) role = 'APPLE METAL (MLX)';
 
                   return (
                     <div
@@ -493,9 +554,41 @@ export default function CommandCenterPage() {
             </div>
           </div>
         )}
+
+        {/* TAB WORKSPACE 4: PEN-TEST & SECURITY POSTURE */}
+        {activeTab === 'security' && (
+          <div className="space-y-6 animate-fadeIn">
+            <PenTestSecurityPanel
+              telemetry={telemetry}
+              onTriggerPenTest={() => handleTriggerAnalysis('security')}
+              isAnalyzing={isAnalyzing}
+            />
+          </div>
+        )}
+
+        {/* TAB WORKSPACE 5: MISSION GOALS */}
+        {activeTab === 'goals' && (
+          <div className="space-y-6 animate-fadeIn">
+            <GoalTracker
+              goals={goals}
+              onToggleMilestone={handleToggleMilestone}
+            />
+          </div>
+        )}
+
+        {/* TAB WORKSPACE 6: DOCKER CLUSTER */}
+        {activeTab === 'docker' && (
+          <div className="space-y-6 animate-fadeIn">
+            <DockerManager
+              containers={dockerData.containers}
+              dockerRunning={dockerData.dockerRunning}
+              onRefresh={fetchDocker}
+            />
+          </div>
+        )}
       </main>
 
-      {/* Floating Tactical AI Copilot (Always pinned to bottom-right corner) */}
+      {/* Floating Tactical AI Copilot (Pinned to bottom-right corner) */}
       <AiTacticalConsole
         isOpen={isAiOpen}
         onClose={() => setIsAiOpen(false)}
@@ -504,6 +597,23 @@ export default function CommandCenterPage() {
         selectedModel={selectedModel}
         onSelectModel={setSelectedModel}
         ollamaOnline={ollamaOnline}
+      />
+
+      {/* 1-Click Tactical Analysis Modal */}
+      <TacticalAnalysisModal
+        report={analysisReport}
+        isOpen={isAnalysisModalOpen}
+        onClose={() => setIsAnalysisModalOpen(false)}
+        onRerun={handleTriggerAnalysis}
+        isLoading={isAnalyzing}
+      />
+
+      {/* Embedded In-App Workspace for Running Applications Inside NEXUS-C2 */}
+      <EmbeddedAppWorkspace
+        app={activeEmbeddedApp}
+        onClose={() => setActiveEmbeddedApp(null)}
+        calendarEvents={calendarEvents}
+        driveFiles={driveFiles}
       />
 
       {/* Register Custom App Modal */}

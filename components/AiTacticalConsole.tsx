@@ -50,7 +50,7 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
   onSelectModel,
   ollamaOnline,
 }) => {
-  const [provider, setProvider] = useState<'ollama' | 'gemini'>('ollama');
+  const isCloudModel = selectedModel.toLowerCase().startsWith('gemini') || selectedModel.toLowerCase().startsWith('claude');
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -238,11 +238,6 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
 
   const handleModelChange = (modelName: string) => {
     onSelectModel(modelName);
-    if (modelName.toLowerCase().startsWith('gemini') || modelName.toLowerCase().startsWith('claude')) {
-      setProvider('gemini');
-    } else {
-      setProvider('ollama');
-    }
   };
 
   const handleSend = async (customPrompt?: string) => {
@@ -254,7 +249,7 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
     if (!customPrompt) setInputMessage('');
     setLoading(true);
 
-    const isGemini = provider === 'gemini' || selectedModel.startsWith('gemini');
+    const isCloud = isCloudModel;
 
     try {
       const res = await fetch('/api/ai/chat', {
@@ -262,9 +257,8 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: textToSend,
-          provider: isGemini ? 'gemini' : 'ollama',
           model: selectedModel,
-          geminiApiKey: isGemini ? geminiApiKey : undefined,
+          geminiApiKey: isCloud ? geminiApiKey : undefined,
         }),
       });
 
@@ -275,23 +269,26 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
           {
             role: 'assistant',
             content: data.response,
-            provider: data.provider,
-            model: data.model,
-            airgap: data.airgap,
+            provider: data.provider || (isCloud ? 'gemini' : 'ollama'),
+            model: data.model || selectedModel,
+            airgap: data.airgap ?? !isCloud,
             authType: data.authType,
           },
         ]);
       } else {
-        if (data.requiresOAuth) {
+        if (data.requiresOAuth && isCloud) {
           setIsOAuthModalOpen(true);
         }
         setMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content: `⚠ [AUTHENTICATION / DIAGNOSTIC ERROR]: ${data.error || 'Failed generating inference response.'}`,
-            provider: isGemini ? 'gemini' : 'ollama',
-            airgap: !isGemini,
+            content: isCloud
+              ? `⚠ [GOOGLE OAUTH ERROR]: ${data.error || 'Failed generating inference response from Google Gemini.'}`
+              : `⚠ [LOCAL AIRGAP ERROR]: ${data.error || 'Failed generating inference response from local model.'}`,
+            provider: isCloud ? 'gemini' : 'ollama',
+            model: selectedModel,
+            airgap: !isCloud,
           },
         ]);
       }
@@ -300,9 +297,10 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
         ...prev,
         {
           role: 'assistant',
-          content: `⚠ [NETWORK ERROR]: ${err.message || 'Could not communicate with AI runtime.'}`,
-          provider,
-          airgap: provider === 'ollama',
+          content: `⚠ [NETWORK / RUNTIME ERROR]: ${err.message || 'Could not communicate with AI runtime.'}`,
+          provider: isCloud ? 'gemini' : 'ollama',
+          model: selectedModel,
+          airgap: !isCloud,
         },
       ]);
     } finally {
@@ -336,7 +334,7 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
           <div>
             <div className="flex items-center gap-1.5">
               <h3 className="font-mono font-bold text-xs text-white">NEXUS COGNITION</h3>
-              {provider === 'gemini' ? (
+              {isCloudModel ? (
                 <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold bg-c2-green/15 text-c2-green border border-c2-green/30 flex items-center gap-1">
                   <Sparkles className="w-2.5 h-2.5 text-c2-green" />
                   GOOGLE OAUTH: {oauthStatus.email?.split('@')[0] || 'supreme'}

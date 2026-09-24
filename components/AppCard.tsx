@@ -23,12 +23,14 @@ import {
   Loader2,
   Check,
   AlertCircle,
-  Box
+  Box,
+  Layers
 } from 'lucide-react';
 
 interface AppCardProps {
   app: AppItem;
   onRefresh: () => void;
+  onOpenInApp?: (app: AppItem) => void;
 }
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -49,7 +51,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Box,
 };
 
-export const AppCard: React.FC<AppCardProps> = ({ app, onRefresh }) => {
+export const AppCard: React.FC<AppCardProps> = ({ app, onRefresh, onOpenInApp }) => {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
@@ -147,12 +149,24 @@ export const AppCard: React.FC<AppCardProps> = ({ app, onRefresh }) => {
 
       {/* Action Bar */}
       <div className="pt-3 border-t border-c2-border/60 flex items-center justify-between gap-2">
-        {/* Left: Launch / Open Window */}
+        {/* Left: In-App Workspace View */}
+        {onOpenInApp && (
+          <button
+            onClick={() => onOpenInApp(app)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg bg-c2-cyan/15 hover:bg-c2-cyan/25 border border-c2-cyan/40 text-xs font-mono font-bold text-c2-cyan transition-all"
+            title="Open inside NEXUS-C2 embedded workspace (no external launch)"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>IN-APP</span>
+          </button>
+        )}
+
+        {/* External Launch */}
         <button
           onClick={() => handleAction('launch')}
           disabled={loadingAction === 'launch'}
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-c2-surface hover:bg-c2-surfaceHover border border-c2-border text-xs font-mono font-semibold text-white hover:text-c2-cyan transition-all disabled:opacity-50"
-          title="Open application window"
+          className="flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg bg-c2-surface hover:bg-c2-surfaceHover border border-c2-border text-xs font-mono text-white hover:text-c2-cyan transition-all disabled:opacity-50"
+          title="Open in external browser/window"
         >
           {loadingAction === 'launch' ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -161,7 +175,7 @@ export const AppCard: React.FC<AppCardProps> = ({ app, onRefresh }) => {
           ) : (
             <ExternalLink className="w-3.5 h-3.5 text-c2-cyan" />
           )}
-          <span>LAUNCH</span>
+          <span className="hidden sm:inline">EXTERNAL</span>
         </button>
 
         {/* Right: Run / Start Process (if runCommand exists) */}

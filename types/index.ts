@@ -119,4 +119,20 @@ export interface SystemTelemetry {
 
 export type ViewMode = 'tactical-c2' | 'cyber-glass' | 'google-ops';
 
-export type TabSpace = 'workspace' | 'apps' | 'goals' | 'docker' | 'cognition';
+export type TabSpace = 'dashboard' | 'workspace' | 'apps' | 'goals' | 'docker' | 'cognition' | 'security';
+
+export type AnalysisDomain = 'calendar' | 'drive' | 'security' | 'cognition' | 'briefing';
+
+export interface AiAnalysisReport {
+  id: string;
+  domain: AnalysisDomain;
+  title: string;
+  timestamp: string;
+  threatLevel: 'NOMINAL' | 'ELEVATED' | 'HIGH' | 'CRITICAL' | 'OPTIMAL';
+  executiveSummary: string;
+  insights: string[];
+  actionItems: string[];
+  analyzedItemCount: number;
+  model: string;
+  authType: string;
+}
