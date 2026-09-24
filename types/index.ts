@@ -76,6 +76,10 @@ export interface GoogleCalendarEvent {
   endTime: string;
   status: 'confirmed' | 'tentative';
   link?: string;
+  accountEmail?: string;
+  accountSlot?: number;
+  calendarName?: string;
+  isAllDay?: boolean;
 }
 
 export interface GoogleTaskItem {
@@ -83,6 +87,7 @@ export interface GoogleTaskItem {
   title: string;
   due?: string;
   completed: boolean;
+  accountEmail?: string;
 }
 
 export interface GmailAlert {
@@ -90,9 +95,13 @@ export interface GmailAlert {
   from: string;
   subject: string;
   snippet: string;
-  date: string;
+  date?: string;
+  time?: string;
   unread: boolean;
-  priority: 'high' | 'normal';
+  priority?: 'high' | 'normal';
+  accountEmail?: string;
+  accountSlot?: number;
+  directUrl?: string;
 }
 
 export interface SystemTelemetry {
