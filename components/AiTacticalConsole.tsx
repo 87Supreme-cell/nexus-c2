@@ -1,21 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { OllamaModel } from '@/types';
 import { 
   Bot, 
-  Sparkles, 
   Send, 
   X, 
-  Maximize2, 
-  Minimize2, 
   ShieldCheck, 
-  Cpu, 
-  RotateCw, 
-  Terminal,
-  Loader2,
-  Copy,
-  Check
+  Loader2, 
+  Copy, 
+  Check, 
+  Sparkles, 
+  Key, 
+  Lock, 
+  ExternalLink,
+  UserCheck,
+  AlertCircle
 } from 'lucide-react';
 
 interface Message {
@@ -24,6 +24,7 @@ interface Message {
   provider?: string;
   model?: string;
   airgap?: boolean;
+  authType?: string;
 }
 
 interface AiTacticalConsoleProps {
@@ -49,10 +50,34 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
   const [loading, setLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
+  // Google OAuth State
+  const [oauthStatus, setOauthStatus] = useState<{
+    connected: boolean;
+    email?: string;
+    authUrl?: string | null;
+  }>({ connected: false });
+  const [isOAuthModalOpen, setIsOAuthModalOpen] = useState(false);
+  const [manualOAuthToken, setManualOAuthToken] = useState('');
+  const [tokenSaveMsg, setTokenSaveMsg] = useState<string | null>(null);
+
+  // Check Google OAuth on mount
+  useEffect(() => {
+    fetch('/api/auth/google')
+      .then((res) => res.json())
+      .then((data) => {
+        setOauthStatus({
+          connected: Boolean(data.connected),
+          email: data.email,
+          authUrl: data.authUrl,
+        });
+      })
+      .catch(() => {});
+  }, []);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'TACTICAL AI COGNITION ENGINE ONLINE. Air-gapped local model active. Ready to orchestrate runtimes, analyze telemetry, or coordinate Google Workspace tasks.',
+      content: 'TACTICAL AI COGNITION ENGINE ONLINE. Air-gapped local models and Google OAuth-enabled Gemini are active. Ready to orchestrate runtimes or analyze mission parameters.',
       provider: 'ollama',
       model: selectedModel,
       airgap: true,
@@ -60,6 +85,42 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
   ]);
 
   if (!isOpen) return null;
+
+  const handleModelChange = (modelName: string) => {
+    onSelectModel(modelName);
+    if (modelName.toLowerCase().startsWith('gemini')) {
+      setProvider('gemini');
+    } else {
+      setProvider('ollama');
+    }
+  };
+
+  const handleSaveOAuthToken = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualOAuthToken.trim()) return;
+
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save-token',
+          accessToken: manualOAuthToken.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTokenSaveMsg('Google OAuth Token verified & saved!');
+        setOauthStatus({ connected: true, email: data.auth?.email });
+        setTimeout(() => {
+          setIsOAuthModalOpen(false);
+          setTokenSaveMsg(null);
+        }, 1200);
+      }
+    } catch {
+      setTokenSaveMsg('Failed saving token');
+    }
+  };
 
   const handleSend = async (customPrompt?: string) => {
     const textToSend = customPrompt || inputMessage;
@@ -70,15 +131,17 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
     if (!customPrompt) setInputMessage('');
     setLoading(true);
 
+    const isGemini = provider === 'gemini' || selectedModel.startsWith('gemini');
+
     try {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: textToSend,
-          provider,
-          model: provider === 'ollama' ? selectedModel : 'gemini-1.5-flash',
-          geminiApiKey: provider === 'gemini' ? geminiApiKey : undefined,
+          provider: isGemini ? 'gemini' : 'ollama',
+          model: selectedModel,
+          geminiApiKey: isGemini ? geminiApiKey : undefined,
         }),
       });
 
@@ -92,16 +155,20 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
             provider: data.provider,
             model: data.model,
             airgap: data.airgap,
+            authType: data.authType,
           },
         ]);
       } else {
+        if (data.requiresOAuth) {
+          setIsOAuthModalOpen(true);
+        }
         setMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content: `⚠ [DIAGNOSTIC ERROR]: ${data.error || 'Failed generating inference response.'}`,
-            provider,
-            airgap: provider === 'ollama',
+            content: `⚠ [AUTHENTICATION / DIAGNOSTIC ERROR]: ${data.error || 'Failed generating inference response.'}`,
+            provider: isGemini ? 'gemini' : 'ollama',
+            airgap: !isGemini,
           },
         ]);
       }
@@ -144,100 +211,107 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-mono font-bold text-sm text-white">NEXUS AI COGNITION</h3>
-              <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
-                provider === 'ollama' ? 'bg-c2-green/10 text-c2-green border border-c2-green/30' : 'bg-c2-purple/10 text-c2-purple border border-c2-purple/30'
-              }`}>
-                {provider === 'ollama' ? 'LOCAL AIRGAP' : 'GEMINI CLOUD'}
-              </span>
+              {provider === 'gemini' ? (
+                <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold bg-c2-purple/15 text-c2-purple border border-c2-purple/30 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" />
+                  {oauthStatus.connected ? 'GEMINI (OAUTH 2.0)' : 'GEMINI (AUTH REQUIRED)'}
+                </span>
+              ) : (
+                <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold bg-c2-green/15 text-c2-green border border-c2-green/30 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" /> LOCAL AIRGAP
+                </span>
+              )}
             </div>
-            <p className="text-[10px] text-c2-textMuted font-mono">Real-time Task & Mission Analysis Copilot</p>
+            <p className="text-[10px] text-c2-textMuted font-mono">
+              Dual-Engine: 19 Local Models + Google OAuth Gemini
+            </p>
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-lg text-c2-textMuted hover:text-white hover:bg-c2-surface transition-all"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* OAuth Status Button */}
+          <button
+            onClick={() => setIsOAuthModalOpen(true)}
+            className={`px-2 py-1 rounded text-[10px] font-mono font-bold flex items-center gap-1 border transition-all ${
+              oauthStatus.connected
+                ? 'bg-c2-green/10 border-c2-green/30 text-c2-green'
+                : 'bg-c2-amber/10 border-c2-amber/30 text-c2-amber hover:bg-c2-amber/20'
+            }`}
+            title="Configure Google OAuth Token for Gemini"
+          >
+            {oauthStatus.connected ? <UserCheck className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+            <span>{oauthStatus.connected ? 'OAuth Linked' : 'Link OAuth'}</span>
+          </button>
+
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-c2-textMuted hover:text-white hover:bg-c2-surface transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Model & Engine Selector Sub-bar */}
       <div className="px-3.5 py-2 bg-c2-surface border-b border-c2-border flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-        {/* Provider Toggle */}
-        <div className="flex items-center gap-1 bg-c2-bg p-0.5 rounded-lg border border-c2-border">
-          <button
-            onClick={() => setProvider('ollama')}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all ${
-              provider === 'ollama' ? 'bg-c2-cyan text-c2-bg shadow-cyan-glow' : 'text-c2-textMuted hover:text-white'
-            }`}
+        {/* Model Selector with Local & Gemini Categories */}
+        <div className="flex items-center gap-1.5 w-full">
+          <span className="text-[10px] text-c2-textMuted font-bold">SELECT LLM:</span>
+          <select
+            value={selectedModel}
+            onChange={(e) => handleModelChange(e.target.value)}
+            className="flex-1 bg-c2-bg border border-c2-border rounded px-2.5 py-1 text-[11px] text-c2-cyan font-mono focus:outline-none focus:border-c2-cyan truncate"
           >
-            Local Ollama
-          </button>
-          <button
-            onClick={() => setProvider('gemini')}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all ${
-              provider === 'gemini' ? 'bg-c2-purple text-white' : 'text-c2-textMuted hover:text-white'
-            }`}
-          >
-            Google Gemini
-          </button>
-        </div>
+            {/* GOOGLE GEMINI CLOUD (OAUTH) */}
+            <optgroup label="── GOOGLE GEMINI (OAUTH CLOUD) ──">
+              <option value="gemini-1.5-flash">Google Gemini 1.5 Flash (OAuth)</option>
+              <option value="gemini-1.5-pro">Google Gemini 1.5 Pro (OAuth)</option>
+              <option value="gemini-2.0-flash">Google Gemini 2.0 Flash (OAuth)</option>
+            </optgroup>
 
-        {/* Model Dropdown */}
-        {provider === 'ollama' ? (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-c2-textMuted">LOCAL ({models.length}):</span>
-            <select
-              value={selectedModel}
-              onChange={(e) => onSelectModel(e.target.value)}
-              className="bg-c2-bg border border-c2-border rounded px-2 py-1 text-[11px] text-c2-cyan font-mono focus:outline-none focus:border-c2-cyan max-w-[240px] truncate"
-            >
-              <optgroup label="── OLLAMA RUNTIME ──">
-                {models.filter(m => m.source === 'ollama').map((m) => (
+            {/* OLLAMA RUNTIMES */}
+            <optgroup label={`── OLLAMA LOCAL RUNTIME (${models.filter(m => m.source === 'ollama').length}) ──`}>
+              {models.filter(m => m.source === 'ollama').map((m) => (
+                <option key={m.name} value={m.name}>
+                  {m.name} ({m.size})
+                </option>
+              ))}
+            </optgroup>
+
+            {/* APPLE MLX */}
+            {models.some(m => m.source === 'mlx') && (
+              <optgroup label="── APPLE MLX LOCAL MODELS ──">
+                {models.filter(m => m.source === 'mlx').map((m) => (
                   <option key={m.name} value={m.name}>
                     {m.name} ({m.size})
                   </option>
                 ))}
               </optgroup>
-              {models.some(m => m.source === 'mlx') && (
-                <optgroup label="── APPLE MLX MODELS ──">
-                  {models.filter(m => m.source === 'mlx').map((m) => (
-                    <option key={m.name} value={m.name}>
-                      {m.name} ({m.size})
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              {models.some(m => m.source === 'lmstudio') && (
-                <optgroup label="── LM STUDIO MODELS ──">
-                  {models.filter(m => m.source === 'lmstudio').map((m) => (
-                    <option key={m.name} value={m.name}>
-                      {m.name} ({m.size})
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              {models.some(m => m.source === 'huggingface') && (
-                <optgroup label="── HUGGING FACE GGUF CACHE ──">
-                  {models.filter(m => m.source === 'huggingface').map((m) => (
-                    <option key={m.name} value={m.name}>
-                      {m.name} ({m.size})
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </div>
-        ) : (
-          <input
-            type="password"
-            placeholder="Gemini API Key..."
-            value={geminiApiKey}
-            onChange={(e) => setGeminiApiKey(e.target.value)}
-            className="bg-c2-bg border border-c2-border rounded px-2 py-1 text-[11px] text-white placeholder-c2-textMuted focus:outline-none focus:border-c2-purple w-40"
-          />
-        )}
+            )}
+
+            {/* LM STUDIO */}
+            {models.some(m => m.source === 'lmstudio') && (
+              <optgroup label="── LM STUDIO LOCAL CACHE ──">
+                {models.filter(m => m.source === 'lmstudio').map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name} ({m.size})
+                  </option>
+                ))}
+              </optgroup>
+            )}
+
+            {/* HUGGING FACE GGUF CACHE */}
+            {models.some(m => m.source === 'huggingface') && (
+              <optgroup label="── HUGGING FACE GGUF CACHE ──">
+                {models.filter(m => m.source === 'huggingface').map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name} ({m.size})
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </div>
       </div>
 
       {/* Message History */}
@@ -253,6 +327,11 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
               <div className="flex items-center gap-2 mb-1 text-[10px] text-c2-textMuted">
                 <span>{isUser ? 'OPERATOR' : 'NEXUS COGNITION'}</span>
                 {msg.model && <span>• {msg.model.split(':')[0]}</span>}
+                {msg.authType && (
+                  <span className="text-c2-purple flex items-center gap-0.5">
+                    <Sparkles className="w-3 h-3" /> {msg.authType}
+                  </span>
+                )}
                 {msg.airgap && (
                   <span className="text-c2-green flex items-center gap-0.5">
                     <ShieldCheck className="w-3 h-3" /> AIRGAP
@@ -289,7 +368,7 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
         {loading && (
           <div className="flex items-center gap-2 text-c2-cyan text-xs font-mono p-2">
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Analyzing mission parameters...</span>
+            <span>Generating cognitive response ({selectedModel.split(':')[0]})...</span>
           </div>
         )}
       </div>
@@ -317,7 +396,7 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleSend();
           }}
-          placeholder="Ask copilot to analyze runtimes, summarize tasks, or draft reports..."
+          placeholder={`Direct prompt to ${selectedModel.split(':')[0]}...`}
           className="flex-1 bg-c2-surface border border-c2-border rounded-lg px-3 py-2 text-xs font-mono text-white placeholder-c2-textMuted focus:outline-none focus:border-c2-cyan"
         />
         <button
@@ -328,6 +407,81 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
           <Send className="w-4 h-4" />
         </button>
       </div>
+
+      {/* GOOGLE OAUTH MODAL FOR GEMINI */}
+      {isOAuthModalOpen && (
+        <div className="absolute inset-0 z-50 bg-c2-bg/95 backdrop-blur-md p-5 flex flex-col justify-between animate-fadeIn font-mono text-xs">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-c2-border">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-c2-purple" />
+                <h4 className="font-bold text-sm text-white">GOOGLE OAUTH FOR GEMINI</h4>
+              </div>
+              <button
+                onClick={() => setIsOAuthModalOpen(false)}
+                className="text-c2-textMuted hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-c2-textMuted mt-3 mb-4 leading-relaxed">
+              Authenticate Gemini using Google OAuth 2.0 Bearer tokens. This allows you to select Gemini alongside your 19 local models without creating individual API keys.
+            </p>
+
+            {tokenSaveMsg && (
+              <div className="p-2.5 rounded bg-c2-green/10 border border-c2-green/30 text-c2-green mb-3 flex items-center gap-2">
+                <Check className="w-4 h-4" />
+                <span>{tokenSaveMsg}</span>
+              </div>
+            )}
+
+            {/* Path 1: One-Click OAuth Login (if Client ID configured) */}
+            {oauthStatus.authUrl && (
+              <div className="mb-4 p-3 rounded-xl bg-c2-surface border border-c2-border">
+                <span className="text-c2-cyan font-bold block mb-1">OPTION 1: ONE-CLICK GOOGLE SIGN-IN</span>
+                <a
+                  href={oauthStatus.authUrl}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-c2-purple text-white font-bold text-xs"
+                >
+                  <span>Authorize with Google Account</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
+
+            {/* Path 2: Direct Bearer Token Input */}
+            <form onSubmit={handleSaveOAuthToken} className="space-y-3">
+              <span className="text-c2-purple font-bold block">
+                {oauthStatus.authUrl ? 'OPTION 2: DIRECT OAUTH / ACCESS TOKEN' : 'ENTER GOOGLE OAUTH ACCESS TOKEN (ya29...)'}
+              </span>
+              <textarea
+                value={manualOAuthToken}
+                onChange={(e) => setManualOAuthToken(e.target.value)}
+                placeholder="Paste Google OAuth Bearer Token (ya29...) or Vertex Access Token here..."
+                rows={3}
+                className="w-full bg-c2-surface border border-c2-border rounded-lg p-2 text-white placeholder-c2-textMuted focus:outline-none focus:border-c2-purple text-[11px]"
+              />
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsOAuthModalOpen(false)}
+                  className="px-3 py-1.5 rounded bg-c2-surface border border-c2-border text-c2-textMuted"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 rounded bg-c2-purple text-white font-bold shadow-lg"
+                >
+                  Save & Enable Gemini OAuth
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
