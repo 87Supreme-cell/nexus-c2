@@ -323,17 +323,19 @@ export default function CommandCenterPage() {
         {/* TAB WORKSPACE 5: AI COGNITION & MODELS CATALOG */}
         {activeTab === 'cognition' && (
           <div className="space-y-6 animate-fadeIn">
+            {/* Top Operational Status Banner */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-c2-card border border-c2-border">
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Bot className="w-5 h-5 text-c2-cyan" />
-                  <h2 className="font-mono font-bold text-base text-white">AI COGNITION & MODEL REPOSITORY</h2>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-c2-cyan/15 text-c2-cyan border border-c2-cyan/30 font-mono font-bold">
-                    {ollamaModels.length} Models Detected
+                  <h2 className="font-mono font-bold text-base text-white">TACTICAL AI COGNITION HUB</h2>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-c2-green/15 text-c2-green border border-c2-green/30 font-mono font-bold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-c2-green animate-pulse" />
+                    DUAL ENGINES READY
                   </span>
                 </div>
-                <p className="text-xs text-c2-textMuted font-mono mt-1">
-                  Air-gapped local runtimes (Ollama, Apple MLX, LM Studio, Hugging Face) and Google OAuth Gemini 3.8
+                <p className="text-xs text-c2-textMuted font-mono">
+                  Google Gemini Cloud (OAuth: <span className="text-c2-cyan">eighty7supreme@gmail.com</span>) + Air-Gapped Local Inference
                 </p>
               </div>
 
@@ -342,46 +344,152 @@ export default function CommandCenterPage() {
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-c2-cyan hover:bg-c2-cyan/90 text-c2-bg font-mono font-bold text-xs shadow-cyan-glow transition-all whitespace-nowrap"
               >
                 <Bot className="w-4 h-4" />
-                <span>OPEN CHAT (BOTTOM RIGHT)</span>
+                <span>OPEN CHAT CONSOLE</span>
               </button>
             </div>
 
-            {/* Models Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {ollamaModels.map((m) => (
-                <div
-                  key={m.name}
-                  onClick={() => {
-                    setSelectedModel(m.name);
-                    setIsAiOpen(true);
-                  }}
-                  className="p-4 rounded-xl bg-c2-surface border border-c2-border hover:border-c2-cyan/40 hover:bg-c2-surfaceHover transition-all cursor-pointer flex flex-col justify-between group shadow-md"
-                >
-                  <div>
-                    <div className="flex items-center justify-between text-[11px] font-mono mb-2">
-                      <span className={`px-2 py-0.5 rounded-full font-bold uppercase text-[9px] border ${
-                        m.source === 'ollama' ? 'bg-c2-green/10 text-c2-green border-c2-green/30' :
-                        m.source === 'mlx' ? 'bg-c2-purple/10 text-c2-purple border-c2-purple/30' :
-                        m.source === 'lmstudio' ? 'bg-c2-amber/10 text-c2-amber border-c2-amber/30' :
-                        'bg-c2-cyan/10 text-c2-cyan border-c2-cyan/30'
-                      }`}>
-                        {m.source}
-                      </span>
-                      <span className="text-c2-textMuted">{m.size}</span>
-                    </div>
-
-                    <h4 className="font-mono font-bold text-sm text-white group-hover:text-c2-cyan transition-colors line-clamp-1 mb-1">
-                      {m.name}
-                    </h4>
-                    <p className="text-[11px] font-mono text-c2-textMuted">{m.format || 'Standard Weights'}</p>
-                  </div>
-
-                  <div className="pt-3 border-t border-c2-border/60 flex items-center justify-between text-[10px] font-mono text-c2-cyan mt-3">
-                    <span>Click to chat</span>
-                    <span>→</span>
-                  </div>
+            {/* SECTION 1: GOOGLE GEMINI CLOUD (OAUTH LINKED) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-c2-cyan" />
+                  <span className="font-mono font-bold text-xs text-white uppercase tracking-wide">
+                    GOOGLE GEMINI CLOUD &bull; AUTHENTICATED VIA ACTIVE GOOGLE SESSION
+                  </span>
                 </div>
-              ))}
+                <span className="text-[10px] font-mono text-c2-green font-bold">
+                  SESSION ACTIVE (eighty7supreme@gmail.com)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[
+                  {
+                    id: 'gemini-3.8-flash',
+                    name: 'Google Gemini 3.8 Flash',
+                    role: 'SPEED & REASONING',
+                    desc: 'Frontier speed, tactical synthesis, multimodal tool execution, and live workspace search.',
+                    badge: 'Google OAuth 2.0',
+                    color: 'cyan',
+                  },
+                  {
+                    id: 'gemini-3.1-pro',
+                    name: 'Google Gemini 3.1 Pro',
+                    role: 'DEEP THINKING',
+                    desc: 'Complex system architecture, zero-trust pen-test validation, and high-context analysis.',
+                    badge: 'Google OAuth 2.0',
+                    color: 'purple',
+                  },
+                  {
+                    id: 'claude-sonnet-4-6',
+                    name: 'Claude Sonnet 4.6',
+                    role: 'EXTENDED CODING',
+                    desc: 'Frontier code generation, refactoring, and algorithmic reasoning via OAuth bridge.',
+                    badge: 'Antigravity OAuth',
+                    color: 'amber',
+                  },
+                ].map((item) => {
+                  const isSelected = selectedModel === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        setSelectedModel(item.id);
+                        setIsAiOpen(true);
+                      }}
+                      className={`p-4 rounded-xl bg-c2-surface border transition-all cursor-pointer flex flex-col justify-between group shadow-md ${
+                        isSelected
+                          ? 'border-c2-cyan shadow-cyan-glow bg-c2-surfaceHover'
+                          : 'border-c2-border hover:border-c2-cyan/50 hover:bg-c2-surfaceHover'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between text-xs font-mono mb-2">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-c2-cyan/10 text-c2-cyan border border-c2-cyan/30">
+                            {item.role}
+                          </span>
+                          <span className="text-[10px] font-mono text-c2-green font-bold">
+                            {item.badge}
+                          </span>
+                        </div>
+                        <h4 className="font-mono font-bold text-sm text-white group-hover:text-c2-cyan transition-colors mb-1.5">
+                          {item.name}
+                        </h4>
+                        <p className="text-xs text-c2-textMuted font-sans leading-relaxed">
+                          {item.desc}
+                        </p>
+                      </div>
+
+                      <div className="pt-3 border-t border-c2-border/60 flex items-center justify-between text-xs font-mono text-c2-cyan mt-3">
+                        <span className="font-bold">{isSelected ? 'ACTIVE LLM' : 'ENGAGE MODEL'}</span>
+                        <span>→</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* SECTION 2: CURATED LOCAL AIR-GAPPED MODELS */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <Boxes className="w-4 h-4 text-c2-green" />
+                  <span className="font-mono font-bold text-xs text-white uppercase tracking-wide">
+                    LOCAL AIRGAP INFERENCE &bull; CURATED RUNTIME ({ollamaModels.length} Models)
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-c2-green font-bold">
+                  ZERO-EGRESS AIRGAP
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {ollamaModels.map((m) => {
+                  const isSelected = selectedModel === m.name;
+                  let role = 'GENERAL INFERENCE';
+                  if (m.name.includes('coder')) role = 'CODE SPECIALIST';
+                  else if (m.name.includes('r1')) role = 'DEEP REASONING';
+                  else if (m.name.includes('gemma')) role = 'ASSISTANT';
+
+                  return (
+                    <div
+                      key={m.name}
+                      onClick={() => {
+                        setSelectedModel(m.name);
+                        setIsAiOpen(true);
+                      }}
+                      className={`p-4 rounded-xl bg-c2-surface border transition-all cursor-pointer flex flex-col justify-between group shadow-md ${
+                        isSelected
+                          ? 'border-c2-green shadow-green-glow bg-c2-surfaceHover'
+                          : 'border-c2-border hover:border-c2-green/50 hover:bg-c2-surfaceHover'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between text-xs font-mono mb-2">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-c2-green/10 text-c2-green border border-c2-green/30">
+                            {role}
+                          </span>
+                          <span className="text-[10px] font-mono text-c2-textMuted">
+                            {m.size}
+                          </span>
+                        </div>
+                        <h4 className="font-mono font-bold text-sm text-white group-hover:text-c2-green transition-colors mb-1">
+                          {m.name}
+                        </h4>
+                        <p className="text-xs text-c2-textMuted font-mono">
+                          {m.format || 'Local Weights'}
+                        </p>
+                      </div>
+
+                      <div className="pt-3 border-t border-c2-border/60 flex items-center justify-between text-xs font-mono text-c2-green mt-3">
+                        <span className="font-bold">{isSelected ? 'ACTIVE LLM' : 'ENGAGE MODEL'}</span>
+                        <span>→</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

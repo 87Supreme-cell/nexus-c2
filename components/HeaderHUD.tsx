@@ -13,7 +13,9 @@ import {
   Target,
   Boxes,
   Link,
-  UserCheck
+  UserCheck,
+  Download,
+  Laptop
 } from 'lucide-react';
 import { GoogleAccountConfig } from '@/lib/google-calendar-service';
 
@@ -40,6 +42,52 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
   const [localTime, setLocalTime] = useState<string>('');
   const [isLaunchingAgy, setIsLaunchingAgy] = useState(false);
   const [agyMessage, setAgyMessage] = useState<string | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [appNotice, setAppNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
+      setIsStandalone(true);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallOrLaunchApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        setDeferredPrompt(null);
+        setAppNotice('Installed to Chrome Apps!');
+        setTimeout(() => setAppNotice(null), 3000);
+        return;
+      }
+    }
+
+    setAppNotice('Launching Chrome App Window...');
+    try {
+      const res = await fetch('/api/system/launch-app-window', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setAppNotice(data.message || 'Launched Chrome App');
+      }
+    } catch {
+      setAppNotice('Failed launching Chrome App');
+    } finally {
+      setTimeout(() => setAppNotice(null), 3500);
+    }
+  };
 
   useEffect(() => {
     const updateClocks = () => {
@@ -189,6 +237,16 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
             </span>
           </button>
 
+          {/* Download / Launch Chrome App Button */}
+          <button
+            onClick={handleInstallOrLaunchApp}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-c2-surface hover:bg-c2-surfaceHover border border-c2-cyan/40 text-c2-cyan hover:text-white transition-all font-mono text-xs font-bold shadow-cyan-glow"
+            title="Download / Install into Chrome Apps or launch dedicated standalone window"
+          >
+            <Download className="w-3.5 h-3.5 text-c2-cyan" />
+            <span className="hidden md:inline">{isStandalone ? 'CHROME APP' : 'INSTALL APP'}</span>
+          </button>
+
           {/* Antigravity CLI Launcher */}
           <button
             onClick={handleLaunchAntigravity}
@@ -202,11 +260,11 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
         </div>
       </div>
 
-      {/* Temporary Toast for Antigravity spawn */}
-      {agyMessage && (
-        <div className="bg-c2-amber/10 border-t border-b border-c2-amber/30 px-4 py-1 text-center text-xs font-mono text-c2-amber flex items-center justify-center gap-2 animate-fadeIn">
-          <Terminal className="w-3.5 h-3.5" />
-          <span>{agyMessage}</span>
+      {/* Temporary Toast for App notices & Antigravity */}
+      {(agyMessage || appNotice) && (
+        <div className="bg-c2-cyan/10 border-t border-b border-c2-cyan/30 px-4 py-1 text-center text-xs font-mono text-c2-cyan flex items-center justify-center gap-2 animate-fadeIn">
+          <Download className="w-3.5 h-3.5" />
+          <span>{agyMessage || appNotice}</span>
         </div>
       )}
     </header>
