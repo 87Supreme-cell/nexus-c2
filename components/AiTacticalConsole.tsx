@@ -187,17 +187,46 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
         {/* Model Dropdown */}
         {provider === 'ollama' ? (
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-c2-textMuted">MODEL:</span>
+            <span className="text-[10px] text-c2-textMuted">LOCAL ({models.length}):</span>
             <select
               value={selectedModel}
               onChange={(e) => onSelectModel(e.target.value)}
-              className="bg-c2-bg border border-c2-border rounded px-2 py-1 text-[11px] text-c2-cyan font-mono focus:outline-none focus:border-c2-cyan"
+              className="bg-c2-bg border border-c2-border rounded px-2 py-1 text-[11px] text-c2-cyan font-mono focus:outline-none focus:border-c2-cyan max-w-[240px] truncate"
             >
-              {models.map((m) => (
-                <option key={m.name} value={m.name}>
-                  {m.name} ({m.size})
-                </option>
-              ))}
+              <optgroup label="── OLLAMA RUNTIME ──">
+                {models.filter(m => m.source === 'ollama').map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name} ({m.size})
+                  </option>
+                ))}
+              </optgroup>
+              {models.some(m => m.source === 'mlx') && (
+                <optgroup label="── APPLE MLX MODELS ──">
+                  {models.filter(m => m.source === 'mlx').map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.name} ({m.size})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {models.some(m => m.source === 'lmstudio') && (
+                <optgroup label="── LM STUDIO MODELS ──">
+                  {models.filter(m => m.source === 'lmstudio').map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.name} ({m.size})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {models.some(m => m.source === 'huggingface') && (
+                <optgroup label="── HUGGING FACE GGUF CACHE ──">
+                  {models.filter(m => m.source === 'huggingface').map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.name} ({m.size})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
         ) : (

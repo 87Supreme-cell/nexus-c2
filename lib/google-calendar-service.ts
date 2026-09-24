@@ -64,15 +64,53 @@ export function saveCalendarEvents(events: GoogleCalendarEvent[]): void {
   }
 }
 
-function fetchUrl(urlStr: string): Promise<string> {
+function isSafeExternalUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol !== 'https:') return false;
+    const hostname = parsed.hostname.toLowerCase();
+    
+    // Disallow loopback, private ranges, metadata IPs
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname === '169.254.169.254' ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('192.168.') ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local')
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function fetchUrl(urlStr: string, redirects = 0): Promise<string> {
+  if (redirects > 3) return Promise.reject(new Error('Too many redirects'));
+  if (!isSafeExternalUrl(urlStr)) return Promise.reject(new Error('SSRF Blocked: Destination address is prohibited'));
+
   return new Promise((resolve, reject) => {
-    const client = urlStr.startsWith('https://') ? https : http;
-    const req = client.get(urlStr, { timeout: 10000 }, (res) => {
+    const req = https.get(urlStr, { timeout: 6000 }, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return resolve(fetchUrl(res.headers.location));
+        return resolve(fetchUrl(res.headers.location, redirects + 1));
       }
       let data = '';
-      res.on('data', (chunk) => (data += chunk));
+      let bytes = 0;
+      const MAX_BYTES = 5 * 1024 * 1024; // 5 MB max
+
+      res.on('data', (chunk) => {
+        bytes += chunk.length;
+        if (bytes > MAX_BYTES) {
+          req.destroy();
+          return reject(new Error('Payload exceeds maximum allowable threshold'));
+        }
+        data += chunk;
+      });
       res.on('end', () => resolve(data));
     });
     req.on('error', reject);

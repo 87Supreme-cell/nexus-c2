@@ -44,8 +44,13 @@ export interface DockerContainer {
 export interface OllamaModel {
   name: string;
   size: string;
-  modified_at: string;
+  modified_at?: string;
+  source?: 'ollama' | 'lmstudio' | 'mlx' | 'huggingface';
+  format?: string;
+  path?: string;
 }
+
+export type LocalModelInfo = OllamaModel;
 
 export interface GoalMilestone {
   id: string;

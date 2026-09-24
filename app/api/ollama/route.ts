@@ -1,46 +1,34 @@
 import { NextResponse } from 'next/server';
 import http from 'http';
-import { OllamaModel } from '@/types';
+import { scanAllLocalModels } from '@/lib/models-scanner';
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+function checkOllamaPort(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.get('http://127.0.0.1:11434/api/tags', { timeout: 1000 }, () => resolve(true));
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
 }
 
 export async function GET() {
   try {
-    const data = await new Promise<string>((resolve, reject) => {
-      const req = http.get('http://127.0.0.1:11434/api/tags', { timeout: 3000 }, (res) => {
-        let body = '';
-        res.on('data', (chunk) => (body += chunk));
-        res.on('end', () => resolve(body));
-      });
-      req.on('error', (err) => reject(err));
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error('Timeout connecting to Ollama'));
-      });
-    });
-
-    const parsed = JSON.parse(data);
-    const models: OllamaModel[] = (parsed.models || []).map((m: any) => ({
-      name: m.name,
-      size: m.size ? formatBytes(m.size) : 'Unknown',
-      modified_at: m.modified_at,
-    }));
+    const isOnline = await checkOllamaPort();
+    const allModels = await scanAllLocalModels();
 
     return NextResponse.json({
-      online: true,
-      models,
+      online: isOnline,
+      totalCount: allModels.length,
+      models: allModels,
     });
   } catch (error: any) {
     return NextResponse.json({
       online: false,
+      totalCount: 0,
       models: [],
-      error: 'Ollama service is unreachable at 127.0.0.1:11434',
+      error: error?.message || 'Failed scanning local models',
     });
   }
 }

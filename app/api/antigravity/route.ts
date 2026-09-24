@@ -1,27 +1,39 @@
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import path from 'path';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+const AGY_BIN = '/opt/homebrew/bin/agy';
+
+function isApprovedWorkspaceDir(workDir: string): boolean {
+  if (typeof workDir !== 'string') return false;
+  // Must be within /Users/symbrook, must exist, and contain no shell escapes
+  const resolved = path.resolve(workDir);
+  return (
+    resolved.startsWith('/Users/symbrook') &&
+    fs.existsSync(resolved) &&
+    /^[a-zA-Z0-9_\-\/\. ]+$/.test(resolved)
+  );
+}
 
 export async function GET() {
-  const binaryPath = '/opt/homebrew/bin/agy';
-  const installed = fs.existsSync(binaryPath);
+  const installed = fs.existsSync(AGY_BIN);
 
   let version = 'unknown';
   if (installed) {
     try {
-      const { stdout } = await execAsync(`${binaryPath} --version || echo "agy v2.0"`);
+      const { stdout } = await execFileAsync(AGY_BIN, ['--version']);
       version = stdout.trim();
     } catch {
-      version = 'v2.0';
+      version = 'v1.2.9';
     }
   }
 
   return NextResponse.json({
     installed,
-    binaryPath,
+    binaryPath: AGY_BIN,
     version,
     availableAgents: ['self', 'research'],
   });
@@ -32,10 +44,14 @@ export async function POST(req: Request) {
     const { action, prompt, workspaceDir } = await req.json();
     const workDir = workspaceDir || process.cwd();
 
+    if (!isApprovedWorkspaceDir(workDir)) {
+      return NextResponse.json({ success: false, error: 'Access Denied: Unapproved workspace directory' }, { status: 403 });
+    }
+
     if (action === 'open-terminal') {
-      // macOS AppleScript to spawn a dedicated Terminal window with Antigravity
-      const script = `osascript -e 'tell application "Terminal" to do script "cd \\"${workDir}\\" && /opt/homebrew/bin/agy"'`;
-      await execAsync(script);
+      // Execute AppleScript safely without shell
+      const appleScript = `tell application "Terminal" to do script "cd \\"${workDir}\\" && /opt/homebrew/bin/agy"`;
+      await execFileAsync('/usr/bin/osascript', ['-e', appleScript]);
 
       return NextResponse.json({
         success: true,
@@ -44,16 +60,15 @@ export async function POST(req: Request) {
     }
 
     if (action === 'run-prompt') {
-      if (!prompt) {
-        return NextResponse.json({ success: false, error: 'Prompt is required' }, { status: 400 });
+      if (!prompt || typeof prompt !== 'string' || prompt.length > 4096) {
+        return NextResponse.json({ success: false, error: 'Valid prompt string is required' }, { status: 400 });
       }
 
-      // Execute headless agy print command
-      const sanitizedPrompt = prompt.replace(/"/g, '\\"');
-      const { stdout } = await execAsync(
-        `/opt/homebrew/bin/agy --print "${sanitizedPrompt}"`,
-        { cwd: workDir, timeout: 60000 }
-      );
+      // Execute agy directly without shell interpolation
+      const { stdout } = await execFileAsync(AGY_BIN, ['--print', prompt], {
+        cwd: workDir,
+        timeout: 60000,
+      });
 
       return NextResponse.json({
         success: true,
