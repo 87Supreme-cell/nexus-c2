@@ -65,24 +65,101 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
     connected: boolean;
     email?: string;
     authUrl?: string | null;
+    systemDetected?: boolean;
+    systemEmail?: string;
+    authMethod?: string;
   }>({ connected: false });
   const [isOAuthModalOpen, setIsOAuthModalOpen] = useState(false);
   const [manualOAuthToken, setManualOAuthToken] = useState('');
   const [tokenSaveMsg, setTokenSaveMsg] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   // Check Google OAuth on mount
-  useEffect(() => {
-    fetch('/api/auth/google')
-      .then((res) => res.json())
-      .then((data) => {
+  const refreshOAuthStatus = async () => {
+    try {
+      const res = await fetch('/api/auth/google');
+      if (res.ok) {
+        const data = await res.json();
         setOauthStatus({
           connected: Boolean(data.connected),
           email: data.email,
           authUrl: data.authUrl,
+          systemDetected: Boolean(data.systemDetected),
+          systemEmail: data.systemEmail,
+          authMethod: data.authMethod,
         });
-      })
-      .catch(() => {});
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    refreshOAuthStatus();
   }, []);
+
+  const handleConnectSystemOAuth = async () => {
+    setIsConnecting(true);
+    setTokenSaveMsg('Synchronizing Google Account from system session...');
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'connect-system' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.connected) {
+        setTokenSaveMsg(`Signed in successfully as ${data.email || 'operator@google.com'}!`);
+        await refreshOAuthStatus();
+        setTimeout(() => {
+          setIsOAuthModalOpen(false);
+          setTokenSaveMsg(null);
+        }, 1200);
+      } else {
+        setTokenSaveMsg(data.error || 'Failed connecting system account');
+      }
+    } catch (err: any) {
+      setTokenSaveMsg(err.message || 'Connection error');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleLaunchGoogleSignIn = async () => {
+    setIsConnecting(true);
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'launch-browser-login' }),
+      });
+      const data = await res.json();
+      if (data.url && !data.launched) {
+        window.open(data.url, '_blank');
+      }
+      setTokenSaveMsg('Google Sign-In window opened. Complete sign-in in your browser.');
+    } catch {
+      if (oauthStatus.authUrl) {
+        window.open(oauthStatus.authUrl, '_blank');
+      }
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDisconnectOAuth = async () => {
+    setIsConnecting(true);
+    try {
+      await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'disconnect' }),
+      });
+      setTokenSaveMsg('Google Account disconnected.');
+      await refreshOAuthStatus();
+      setTimeout(() => setTokenSaveMsg(null), 1500);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -355,12 +432,11 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
             {/* GOOGLE GEMINI CLOUD (OAUTH) */}
             <optgroup label="── GOOGLE GEMINI (NEXT-GEN OAUTH) ──">
               <option value="gemini-3.8-flash">Google Gemini 3.8 Flash (High Speed & Reasoning)</option>
-              <option value="gemini-3.5-flash">Google Gemini 3.5 Flash</option>
-              <option value="gemini-3-flash">Google Gemini 3.0 Flash</option>
-              <option value="gemini-2.5-flash">Google Gemini 2.5 Flash</option>
-              <option value="gemini-2.0-flash">Google Gemini 2.0 Flash</option>
-              <option value="gemini-3.8-pro">Google Gemini 3.8 Pro</option>
-              <option value="gemini-1.5-flash">Google Gemini 1.5 Flash (Legacy)</option>
+              <option value="gemini-3.7-flash">Google Gemini 3.7 Flash</option>
+              <option value="gemini-3.6-flash">Google Gemini 3.6 Flash</option>
+              <option value="gemini-3.1-pro">Google Gemini 3.1 Pro (Deep Thinking)</option>
+              <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (Thinking via OAuth)</option>
+              <option value="claude-opus-4-6-thinking">Claude Opus 4.6 (Thinking via OAuth)</option>
             </optgroup>
 
             {/* OLLAMA RUNTIMES */}
@@ -502,9 +578,9 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
         </button>
       </div>
 
-      {/* GOOGLE OAUTH MODAL FOR GEMINI */}
+      {/* GOOGLE OAUTH SIGN-IN MODAL FOR GEMINI */}
       {isOAuthModalOpen && (
-        <div className="absolute inset-0 z-50 bg-c2-bg/95 backdrop-blur-md p-5 flex flex-col justify-between animate-fadeIn font-mono text-xs">
+        <div className="absolute inset-0 z-50 bg-c2-bg/95 backdrop-blur-md p-5 flex flex-col justify-between animate-fadeIn font-mono text-xs overflow-y-auto">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-c2-border">
               <div className="flex items-center gap-2">
@@ -520,59 +596,130 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
             </div>
 
             <p className="text-c2-textMuted mt-3 mb-4 leading-relaxed">
-              Authenticate Gemini using Google OAuth 2.0 Bearer tokens. This allows you to select Gemini alongside your 19 local models without creating individual API keys.
+              Authenticate Gemini using your Google Account. Enables Google Gemini 3.8 Flash, 3.5 Flash, and 3.8 Pro with zero API key configuration.
             </p>
 
             {tokenSaveMsg && (
-              <div className="p-2.5 rounded bg-c2-green/10 border border-c2-green/30 text-c2-green mb-3 flex items-center gap-2">
+              <div
+                className={`p-2.5 rounded mb-4 flex items-center gap-2 border ${
+                  tokenSaveMsg.toLowerCase().includes('failed') || tokenSaveMsg.toLowerCase().includes('error')
+                    ? 'bg-c2-red/10 border-c2-red/30 text-c2-red'
+                    : 'bg-c2-green/10 border-c2-green/30 text-c2-green'
+                }`}
+              >
                 <Check className="w-4 h-4" />
                 <span>{tokenSaveMsg}</span>
               </div>
             )}
 
-            {/* Path 1: One-Click OAuth Login (if Client ID configured) */}
-            {oauthStatus.authUrl && (
-              <div className="mb-4 p-3 rounded-xl bg-c2-surface border border-c2-border">
-                <span className="text-c2-cyan font-bold block mb-1">OPTION 1: ONE-CLICK GOOGLE SIGN-IN</span>
-                <a
-                  href={oauthStatus.authUrl}
-                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-c2-purple text-white font-bold text-xs"
-                >
-                  <span>Authorize with Google Account</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-            )}
-
-            {/* Path 2: Direct Bearer Token Input */}
-            <form onSubmit={handleSaveOAuthToken} className="space-y-3">
-              <span className="text-c2-purple font-bold block">
-                {oauthStatus.authUrl ? 'OPTION 2: DIRECT OAUTH / ACCESS TOKEN' : 'ENTER GOOGLE OAUTH ACCESS TOKEN (ya29...)'}
-              </span>
-              <textarea
-                value={manualOAuthToken}
-                onChange={(e) => setManualOAuthToken(e.target.value)}
-                placeholder="Paste Google OAuth Bearer Token (ya29...) or Vertex Access Token here..."
-                rows={3}
-                className="w-full bg-c2-surface border border-c2-border rounded-lg p-2 text-white placeholder-c2-textMuted focus:outline-none focus:border-c2-purple text-[11px]"
-              />
-
-              <div className="flex items-center justify-end gap-2">
+            {/* IF CONNECTED */}
+            {oauthStatus.connected ? (
+              <div className="p-4 rounded-xl bg-c2-surface border border-c2-green/40 mb-4 space-y-3">
+                <div className="flex items-center gap-2 text-c2-green font-bold">
+                  <UserCheck className="w-4 h-4" />
+                  <span>GOOGLE ACCOUNT LINKED & ACTIVE</span>
+                </div>
+                <div className="p-2.5 rounded-lg bg-c2-bg border border-c2-border flex items-center justify-between">
+                  <span className="text-white font-bold">{oauthStatus.email || 'eighty7supreme@gmail.com'}</span>
+                  <span className="text-[10px] text-c2-green bg-c2-green/15 px-2 py-0.5 rounded border border-c2-green/30 font-bold">
+                    OAuth 2.0
+                  </span>
+                </div>
+                <p className="text-[11px] text-c2-textMuted">
+                  Gemini 3.8 Flash and next-gen Google models are active and authenticated.
+                </p>
                 <button
                   type="button"
-                  onClick={() => setIsOAuthModalOpen(false)}
-                  className="px-3 py-1.5 rounded bg-c2-surface border border-c2-border text-c2-textMuted"
+                  onClick={handleDisconnectOAuth}
+                  disabled={isConnecting}
+                  className="w-full py-2 rounded-lg bg-c2-red/10 border border-c2-red/30 text-c2-red hover:bg-c2-red/20 font-bold transition-all text-center"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 rounded bg-c2-purple text-white font-bold shadow-lg"
-                >
-                  Save & Enable Gemini OAuth
+                  Disconnect Google Account
                 </button>
               </div>
-            </form>
+            ) : (
+              <div className="space-y-4">
+                {/* Option 1: 1-Click System Google Sign-in */}
+                {oauthStatus.systemEmail && (
+                  <div className="p-4 rounded-xl bg-c2-surface border border-c2-purple/50 space-y-2.5 shadow-lg">
+                    <div className="flex items-center gap-1.5 text-c2-purple font-bold text-xs">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>RECOMMENDED: 1-CLICK SYSTEM SIGN-IN</span>
+                    </div>
+                    <p className="text-[11px] text-c2-textMuted leading-relaxed">
+                      Detected active Google account from your system:
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleConnectSystemOAuth}
+                      disabled={isConnecting}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition-all"
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      <span>{isConnecting ? 'Connecting...' : `Sign in as ${oauthStatus.systemEmail}`}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Option 2: Google Sign-in in Browser */}
+                <div className="p-4 rounded-xl bg-c2-surface border border-c2-border space-y-2.5">
+                  <span className="text-white font-bold block text-xs">SIGN IN WITH GOOGLE (BROWSER)</span>
+                  <p className="text-[11px] text-c2-textMuted leading-relaxed">
+                    Authenticate via Google OAuth consent screen in your web browser.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleLaunchGoogleSignIn}
+                    disabled={isConnecting}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white text-gray-900 hover:bg-gray-100 font-bold text-xs transition-all shadow-md"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>Sign in with Google</span>
+                  </button>
+                </div>
+
+                {/* Collapsible Advanced Section */}
+                <details className="pt-2 text-c2-textMuted">
+                  <summary className="cursor-pointer text-[11px] hover:text-white font-mono">
+                    ▸ Advanced: Manual Bearer Token or API Key
+                  </summary>
+                  <form onSubmit={handleSaveOAuthToken} className="mt-3 space-y-2">
+                    <textarea
+                      value={manualOAuthToken}
+                      onChange={(e) => setManualOAuthToken(e.target.value)}
+                      placeholder="Paste Google OAuth Bearer Token (ya29...) or Vertex Access Token here..."
+                      rows={2}
+                      className="w-full bg-c2-surface border border-c2-border rounded-lg p-2 text-white placeholder-c2-textMuted focus:outline-none focus:border-c2-purple text-[11px]"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        className="px-3 py-1.5 rounded bg-c2-purple text-white font-bold text-xs"
+                      >
+                        Save Token
+                      </button>
+                    </div>
+                  </form>
+                </details>
+              </div>
+            )}
           </div>
         </div>
       )}

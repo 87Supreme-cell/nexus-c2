@@ -25,6 +25,19 @@ export const GoogleConnectModal: React.FC<GoogleConnectModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
+  const [systemEmail, setSystemEmail] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetch('/api/auth/google')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.systemEmail) {
+          setSystemEmail(d.systemEmail);
+          if (!account?.email) setEmail(d.systemEmail);
+        }
+      })
+      .catch(() => {});
+  }, [account]);
 
   if (!isOpen) return null;
 
@@ -115,6 +128,60 @@ export const GoogleConnectModal: React.FC<GoogleConnectModalProps> = ({
             >
               {isError ? <AlertCircle className="w-4 h-4" /> : <Check className="w-4 h-4" />}
               <span>{statusMessage}</span>
+            </div>
+          )}
+
+          {/* 1-Click System Google Sign-In */}
+          {systemEmail && !account?.connected && (
+            <div className="p-3.5 rounded-xl bg-c2-green/10 border border-c2-green/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-c2-green font-bold flex items-center gap-1.5 text-xs">
+                  <Sparkles className="w-3.5 h-3.5" /> DETECTED GOOGLE ACCOUNT
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-c2-green/20 text-c2-green font-bold">System Active</span>
+              </div>
+              <p className="text-[11px] text-c2-textMuted leading-relaxed">
+                Found authenticated Google session for <strong className="text-white">{systemEmail}</strong> on this Mac.
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  setLoading(true);
+                  setStatusMessage(`Connecting ${systemEmail}...`);
+                  try {
+                    await fetch('/api/auth/google', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'connect-system' }),
+                    });
+                    await fetch('/api/google', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        action: 'connect-account',
+                        email: systemEmail,
+                        accountIndex: 0,
+                        syncMethod: 'oauth',
+                      }),
+                    });
+                    setStatusMessage(`Connected as ${systemEmail}!`);
+                    setTimeout(() => {
+                      onAccountUpdated();
+                      onClose();
+                    }, 1000);
+                  } catch (err: any) {
+                    setIsError(true);
+                    setStatusMessage(err.message || 'Connection failed');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-c2-green text-c2-bg font-bold text-xs shadow-green-glow hover:bg-c2-green/90 transition-all"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>1-Click Connect as {systemEmail}</span>
+              </button>
             </div>
           )}
 

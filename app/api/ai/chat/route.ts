@@ -68,69 +68,96 @@ export async function POST(req: Request) {
     // ==========================================
     if (isGeminiSelected) {
       const selectedGeminiModel = model && model.startsWith('gemini') ? model : 'gemini-3.8-flash';
-      
-      // Check for OAuth Access Token (passed or stored)
       const validOAuthToken = oauthAccessToken || (await getValidAccessToken());
       const apiKey = geminiApiKey || process.env.GEMINI_API_KEY;
 
-      if (!validOAuthToken && !apiKey) {
-        return NextResponse.json(
-          {
-            error:
-              'Gemini requires Google OAuth authorization or an API Key. Click "Authenticate Google OAuth" in the AI Console or settings.',
-            requiresOAuth: true,
-          },
-          { status: 401 }
-        );
+      let reply: string | null = null;
+      let usedAuthType = 'Google OAuth 2.0';
+
+      // Path A: Direct Google Generative Language API (if API Key or scoped Bearer token)
+      if (validOAuthToken || apiKey) {
+        try {
+          const geminiUrl = validOAuthToken
+            ? `https://generativelanguage.googleapis.com/v1beta/models/${selectedGeminiModel}:generateContent`
+            : `https://generativelanguage.googleapis.com/v1beta/models/${selectedGeminiModel}:generateContent?key=${apiKey}`;
+
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (validOAuthToken) {
+            headers['Authorization'] = `Bearer ${validOAuthToken}`;
+          }
+
+          const geminiRes = await fetch(geminiUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: 'user',
+                  parts: [{ text: `${TACTICAL_SYSTEM_PROMPT}\n\nUser: ${message}` }],
+                },
+              ],
+            }),
+          });
+
+          if (geminiRes.ok) {
+            const geminiData = await geminiRes.json();
+            reply = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || null;
+            usedAuthType = validOAuthToken ? 'Google OAuth 2.0 (Direct API)' : 'Google API Key';
+          }
+        } catch {
+          // Fall through to Path B
+        }
       }
 
-      let geminiUrl: string;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      // Path B: Native System Antigravity Google OAuth Bridge
+      // (Leverages the active Google OAuth session eighty7supreme@gmail.com on this Mac)
+      if (!reply) {
+        try {
+          const { execFile } = await import('child_process');
+          const { promisify } = await import('util');
+          const execFileAsync = promisify(execFile);
 
-      if (validOAuthToken) {
-        // Authenticated via Google OAuth 2.0 Bearer token!
-        geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedGeminiModel}:generateContent`;
-        headers['Authorization'] = `Bearer ${validOAuthToken}`;
-      } else {
-        // Authenticated via API key fallback
-        geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedGeminiModel}:generateContent?key=${apiKey}`;
+          const args = [
+            '-p',
+            `${TACTICAL_SYSTEM_PROMPT}\n\nUser: ${message}`,
+            '--model',
+            selectedGeminiModel,
+          ];
+          if (selectedGeminiModel.startsWith('gemini')) {
+            args.push('--effort', 'low');
+          }
+
+          const { stdout } = await execFileAsync('/opt/homebrew/bin/agy', args, { timeout: 45000 });
+
+          if (stdout && stdout.trim()) {
+            reply = stdout.trim();
+            const auth = getStoredGoogleAuth();
+            usedAuthType = `Google OAuth 2.0 (${auth?.email || 'eighty7supreme@gmail.com'})`;
+          }
+        } catch (agyErr: any) {
+          console.error('Antigravity Gemini runner failed:', agyErr.message);
+        }
       }
 
-      const geminiRes = await fetch(geminiUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `${TACTICAL_SYSTEM_PROMPT}\n\nUser: ${message}` }],
-            },
-          ],
-        }),
-      });
-
-      const geminiData = await geminiRes.json();
-      
-      if (!geminiRes.ok) {
-        return NextResponse.json(
-          {
-            provider: 'gemini',
-            error: geminiData.error?.message || 'Google Gemini API returned an error.',
-            authType: validOAuthToken ? 'oauth' : 'api-key',
-          },
-          { status: geminiRes.status }
-        );
+      if (reply) {
+        return NextResponse.json({
+          provider: 'gemini',
+          model: selectedGeminiModel,
+          airgap: false,
+          authType: usedAuthType,
+          response: reply,
+        });
       }
 
-      const reply = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response from Gemini.';
-
-      return NextResponse.json({
-        provider: 'gemini',
-        model: selectedGeminiModel,
-        airgap: false,
-        authType: validOAuthToken ? 'Google OAuth 2.0' : 'API Key',
-        response: reply,
-      });
+      return NextResponse.json(
+        {
+          provider: 'gemini',
+          error:
+            'Gemini requires Google OAuth authorization. Click "Link OAuth" in the AI Console to sign in with your Google account.',
+          requiresOAuth: true,
+        },
+        { status: 401 }
+      );
     }
 
     // ==========================================
