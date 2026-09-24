@@ -88,6 +88,7 @@ export interface GoogleTaskItem {
   due?: string;
   completed: boolean;
   accountEmail?: string;
+  priority?: 'critical' | 'high' | 'medium' | 'low';
 }
 
 export interface GmailAlert {
@@ -117,9 +118,16 @@ export interface SystemTelemetry {
   antigravityDetected: boolean;
 }
 
-export type ViewMode = 'tactical-c2' | 'cyber-glass' | 'google-ops';
+export type OperationalMode = 'defense-c2' | 'enterprise' | 'unified';
 
-export type TabSpace = 'dashboard' | 'workspace' | 'apps' | 'goals' | 'docker' | 'cognition' | 'security';
+export type TabSpace = 
+  | 'dashboard'
+  | 'inbox'
+  | 'calendar'
+  | 'tasks'
+  | 'workspace'
+  | 'cognition'
+  | 'security';
 
 export type AnalysisDomain = 'calendar' | 'drive' | 'security' | 'cognition' | 'briefing';
 

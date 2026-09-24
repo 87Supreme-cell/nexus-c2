@@ -17,7 +17,11 @@ import {
   Download,
   Laptop,
   LayoutDashboard,
-  ShieldCheck
+  ShieldCheck,
+  Bell,
+  Mail,
+  CheckSquare,
+  FolderSync
 } from 'lucide-react';
 import { GoogleAccountConfig } from '@/lib/google-calendar-service';
 
@@ -29,6 +33,8 @@ interface HeaderHUDProps {
   selectedModel: string;
   account: GoogleAccountConfig | null;
   onOpenConnectModal: () => void;
+  unreadNotificationsCount?: number;
+  onToggleNotifications?: () => void;
 }
 
 export const HeaderHUD: React.FC<HeaderHUDProps> = ({
@@ -39,6 +45,8 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
   selectedModel,
   account,
   onOpenConnectModal,
+  unreadNotificationsCount = 0,
+  onToggleNotifications,
 }) => {
   const [zuluTime, setZuluTime] = useState<string>('');
   const [localTime, setLocalTime] = useState<string>('');
@@ -129,12 +137,12 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
 
   const TABS: { id: TabSpace; label: string; icon: React.ElementType; badge?: string }[] = [
     { id: 'dashboard', label: 'C2 Overview', icon: LayoutDashboard },
-    { id: 'workspace', label: 'Google Workspace', icon: Calendar, badge: account?.connected ? 'Linked' : undefined },
-    { id: 'apps', label: 'App Launcher', icon: Grid },
+    { id: 'inbox', label: 'Inbox & Drafter', icon: Mail, badge: unreadNotificationsCount ? `${unreadNotificationsCount}` : undefined },
+    { id: 'calendar', label: 'Calendar Ops', icon: Calendar },
+    { id: 'tasks', label: 'Mission Tasks', icon: CheckSquare },
+    { id: 'workspace', label: 'Drive Explorer', icon: FolderSync },
     { id: 'cognition', label: 'AI Cognition', icon: Bot },
     { id: 'security', label: 'Pen-Test & Sec', icon: ShieldCheck, badge: 'A+' },
-    { id: 'goals', label: 'Mission Objectives', icon: Target },
-    { id: 'docker', label: 'Docker Cluster', icon: Boxes },
   ];
 
   return (
@@ -209,8 +217,24 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
           })}
         </nav>
 
-        {/* Right: Connect Account, AI Copilot & Antigravity Launcher */}
+        {/* Right: Notifications, Connect Account, AI Copilot & Antigravity Launcher */}
         <div className="flex items-center gap-2">
+          {/* Tactical Notifications Bell Button */}
+          {onToggleNotifications && (
+            <button
+              onClick={onToggleNotifications}
+              className="relative p-2 rounded-lg bg-c2-surface hover:bg-c2-surfaceHover border border-c2-border text-c2-textMuted hover:text-white transition-all"
+              title="Tactical Notifications & Event Triggers"
+            >
+              <Bell className="w-4 h-4 text-c2-cyan" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-c2-red text-[9px] font-bold text-white flex items-center justify-center animate-pulse">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+          )}
+
           {/* AI Copilot Toggle Button */}
           <button
             onClick={onToggleAi}

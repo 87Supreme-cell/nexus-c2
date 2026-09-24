@@ -2,52 +2,47 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
-  AppItem, 
-  DockerContainer, 
   OllamaModel, 
-  GoalItem, 
   GoogleCalendarEvent, 
   GoogleTaskItem, 
   GmailAlert, 
   SystemTelemetry, 
   TabSpace,
   AiAnalysisReport,
-  AnalysisDomain
+  AnalysisDomain,
+  OperationalMode
 } from '@/types';
 import { HeaderHUD } from '@/components/HeaderHUD';
 import { KpiTelemetry } from '@/components/KpiTelemetry';
-import { AppGrid } from '@/components/AppGrid';
 import { GoogleWorkspaceHub } from '@/components/GoogleWorkspaceHub';
-import { GoalTracker } from '@/components/GoalTracker';
-import { DockerManager } from '@/components/DockerManager';
 import { AiTacticalConsole } from '@/components/AiTacticalConsole';
-import { AddAppModal } from '@/components/AddAppModal';
 import { GoogleConnectModal } from '@/components/GoogleConnectModal';
 import { TacticalDashboard } from '@/components/TacticalDashboard';
 import { TacticalAnalysisModal } from '@/components/TacticalAnalysisModal';
-import { EmbeddedAppWorkspace } from '@/components/EmbeddedAppWorkspace';
 import { PenTestSecurityPanel } from '@/components/PenTestSecurityPanel';
-import { INITIAL_GOALS, INITIAL_CALENDAR_EVENTS, INITIAL_GOOGLE_TASKS, INITIAL_GMAIL_ALERTS } from '@/lib/goals-data';
+import { InteractiveInboxDeck } from '@/components/InteractiveInboxDeck';
+import { InteractiveCalendarOps } from '@/components/InteractiveCalendarOps';
+import { MissionTasksBoard } from '@/components/MissionTasksBoard';
+import { TacticalNotificationCenter } from '@/components/TacticalNotificationCenter';
+import { INITIAL_CALENDAR_EVENTS, INITIAL_GOOGLE_TASKS, INITIAL_GMAIL_ALERTS } from '@/lib/goals-data';
 import { GoogleAccountConfig } from '@/lib/google-calendar-service';
 import { DriveDocumentItem } from '@/lib/google-drive-bridge';
-import { Sparkles, Bot, Calendar, Grid, Target, Boxes, ShieldCheck } from 'lucide-react';
+import { EmailMessage } from '@/lib/email-service';
+import { Sparkles, Bot, Calendar, Boxes } from 'lucide-react';
 
 export default function CommandCenterPage() {
-  // Primary Landing Page is 'dashboard' (C2 Overview with 3D HoloSphere & Large KPI Cards)
+  // Operational Mode State ('defense-c2' | 'enterprise' | 'unified')
+  const [operationalMode, setOperationalMode] = useState<OperationalMode>('defense-c2');
+
+  // Primary Landing Page is 'dashboard' (C2 Overview with 3D HoloSphere & Capability Launchpad)
   const [activeTab, setActiveTab] = useState<TabSpace>('dashboard');
   const [isAiOpen, setIsAiOpen] = useState(false);
-  const [isAddAppOpen, setIsAddAppOpen] = useState(false);
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   // Core Data States
-  const [apps, setApps] = useState<AppItem[]>([]);
   const [telemetry, setTelemetry] = useState<SystemTelemetry | null>(null);
-  const [dockerData, setDockerData] = useState<{ dockerRunning: boolean; containers: DockerContainer[] }>({
-    dockerRunning: false,
-    containers: [],
-  });
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
-  // Default selected model is Gemini 3.8 Flash (Active Google OAuth Session)
   const [selectedModel, setSelectedModel] = useState<string>('gemini-3.8-flash');
   const [ollamaOnline, setOllamaOnline] = useState<boolean>(true);
 
@@ -57,18 +52,12 @@ export default function CommandCenterPage() {
   const [alerts, setAlerts] = useState<GmailAlert[]>(INITIAL_GMAIL_ALERTS);
   const [account, setAccount] = useState<GoogleAccountConfig | null>(null);
   const [driveFiles, setDriveFiles] = useState<DriveDocumentItem[]>([]);
-
-  // In-App Embedded Workspace Active App
-  const [activeEmbeddedApp, setActiveEmbeddedApp] = useState<AppItem | null>(null);
+  const [emails, setEmails] = useState<EmailMessage[]>([]);
 
   // 1-Click AI Analysis State
   const [analysisReport, setAnalysisReport] = useState<AiAnalysisReport | null>(null);
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-
-  // Goals
-  const [goals, setGoals] = useState<GoalItem[]>(INITIAL_GOALS);
-  const [isLoadingApps, setIsLoadingApps] = useState(false);
 
   // Fetch telemetry
   const fetchTelemetry = useCallback(async () => {
@@ -80,38 +69,6 @@ export default function CommandCenterPage() {
       }
     } catch (err) {
       console.error('Telemetry fetch error:', err);
-    }
-  }, []);
-
-  // Fetch apps & ping
-  const fetchApps = useCallback(async () => {
-    setIsLoadingApps(true);
-    try {
-      const res = await fetch('/api/apps');
-      if (res.ok) {
-        const data: AppItem[] = await res.json();
-        setApps(data);
-      }
-    } catch (err) {
-      console.error('Apps fetch error:', err);
-    } finally {
-      setIsLoadingApps(false);
-    }
-  }, []);
-
-  // Fetch Docker status
-  const fetchDocker = useCallback(async () => {
-    try {
-      const res = await fetch('/api/docker');
-      if (res.ok) {
-        const data = await res.json();
-        setDockerData({
-          dockerRunning: Boolean(data.dockerRunning),
-          containers: data.containers || [],
-        });
-      }
-    } catch (err) {
-      console.error('Docker fetch error:', err);
     }
   }, []);
 
@@ -162,6 +119,21 @@ export default function CommandCenterPage() {
     }
   }, []);
 
+  // Fetch Emails
+  const fetchEmails = useCallback(async () => {
+    try {
+      const res = await fetch('/api/email');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.emails) {
+          setEmails(data.emails);
+        }
+      }
+    } catch (err) {
+      console.error('Failed fetching emails:', err);
+    }
+  }, []);
+
   // 1-Click AI Synthesis Trigger
   const handleTriggerAnalysis = async (domain: AnalysisDomain) => {
     setIsAnalyzing(true);
@@ -186,46 +158,40 @@ export default function CommandCenterPage() {
   // Initial Data Load
   useEffect(() => {
     fetchTelemetry();
-    fetchApps();
-    fetchDocker();
     fetchOllama();
     fetchGoogleData();
     fetchDriveFiles();
+    fetchEmails();
 
     const interval = setInterval(() => {
       fetchTelemetry();
-      fetchApps();
+      fetchEmails();
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [fetchTelemetry, fetchApps, fetchDocker, fetchOllama, fetchGoogleData, fetchDriveFiles]);
+  }, [fetchTelemetry, fetchOllama, fetchGoogleData, fetchDriveFiles, fetchEmails]);
 
-  // Milestone toggle handler
-  const handleToggleMilestone = (goalId: string, milestoneId: string) => {
-    setGoals((prev) =>
-      prev.map((g) => {
-        if (g.id !== goalId) return g;
-        const updatedMilestones = g.milestones.map((m) =>
-          m.id === milestoneId ? { ...m, done: !m.done } : m
-        );
-        const doneCount = updatedMilestones.filter((m) => m.done).length;
-        const progress = Math.round((doneCount / (updatedMilestones.length || 1)) * 100);
-        return { ...g, milestones: updatedMilestones, progress };
-      })
-    );
-  };
-
-  // Google Task add handler
-  const handleAddTask = async (title: string) => {
+  // Real Task Creation Handler
+  const handleAddTask = async (title: string, accountEmail?: string, priority?: string) => {
     try {
       const res = await fetch('/api/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add-task', item: { title } }),
+        body: JSON.stringify({
+          action: 'add-task',
+          item: {
+            title,
+            accountEmail: accountEmail || 'eighty7supreme@gmail.com',
+            priority: priority || 'high',
+            due: 'Today',
+          },
+        }),
       });
       const data = await res.json();
       if (data.task) {
         setTasks((prev) => [data.task, ...prev]);
+      } else if (data.tasks) {
+        setTasks(data.tasks);
       }
     } catch {
       const fallback: GoogleTaskItem = {
@@ -233,18 +199,80 @@ export default function CommandCenterPage() {
         title,
         due: 'Today',
         completed: false,
+        accountEmail: accountEmail || 'eighty7supreme@gmail.com',
       };
       setTasks((prev) => [fallback, ...prev]);
     }
   };
 
-  // Google Event add handler
-  const handleAddEvent = async (title: string, startTime: string) => {
+  // Task Toggle Handler
+  const handleToggleTask = async (id: string, completed: boolean) => {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed } : t)));
+    try {
+      await fetch('/api/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle-task', taskId: id, completed }),
+      });
+    } catch {}
+  };
+
+  // Task Delete Handler
+  const handleDeleteTask = async (id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await fetch('/api/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete-task', taskId: id }),
+      });
+    } catch {}
+  };
+
+  // 1-Click AI Task Decomposition via Gemini 3.8 Flash
+  const handleDecomposeTaskWithAi = async (taskTitle: string): Promise<string[]> => {
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Decompose this operational objective into exactly 3 concise, highly actionable tactical subtasks:\n"${taskTitle}"\nReturn ONLY the 3 subtasks separated by newlines, with no bullet characters, no numbers, and no commentary.`,
+          model: 'gemini-3.8-flash',
+        }),
+      });
+      const data = await res.json();
+      if (data.response) {
+        return data.response
+          .split('\n')
+          .map((s: string) => s.replace(/^[0-9\-\*\.\s]+/, '').trim())
+          .filter((s: string) => s.length > 0)
+          .slice(0, 4);
+      }
+    } catch (err) {
+      console.error('Task decomposition error:', err);
+    }
+    return [
+      `Review prerequisite requirements for "${taskTitle}"`,
+      `Execute direct verification test`,
+      `Log compliance report and sign off`,
+    ];
+  };
+
+  // Real Calendar Event Add Handler
+  const handleAddEvent = async (title: string, startTime: string, accountEmail?: string) => {
     try {
       const res = await fetch('/api/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add-event', item: { title, startTime } }),
+        body: JSON.stringify({
+          action: 'add-event',
+          item: {
+            title,
+            startTime,
+            accountEmail: accountEmail || 'eighty7supreme@gmail.com',
+            status: 'confirmed',
+          },
+        }),
       });
       const data = await res.json();
       if (data.events) {
@@ -257,13 +285,16 @@ export default function CommandCenterPage() {
         startTime,
         endTime: `${parseInt(startTime.split(':')[0], 10) + 1}:00`,
         status: 'confirmed',
+        accountEmail: accountEmail || 'eighty7supreme@gmail.com',
         link: 'https://calendar.google.com/',
       };
       setCalendarEvents((prev) => [fallback, ...prev]);
     }
   };
 
+  // Calendar Event Delete Handler
   const handleDeleteEvent = async (eventId: string) => {
+    setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
     try {
       const res = await fetch('/api/google', {
         method: 'POST',
@@ -274,20 +305,16 @@ export default function CommandCenterPage() {
       if (data.events) {
         setCalendarEvents(data.events);
       }
-    } catch {
-      setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
-    }
+    } catch {}
   };
 
-  const overallGoalProgress = Math.round(
-    goals.reduce((acc, curr) => acc + curr.progress, 0) / (goals.length || 1)
-  );
-
-  const onlineAppsCount = apps.filter((a) => a.status === 'online').length;
+  const completedTasksCount = tasks.filter((t) => t.completed).length;
+  const overallTaskProgress = Math.round((completedTasksCount / (tasks.length || 1)) * 100);
+  const unreadAlertsCount = emails.filter((e) => e.unread).length;
 
   return (
     <div className="min-h-screen bg-c2-bg text-slate-100 bg-tactical-grid transition-colors">
-      {/* Top Tactical HUD Header with Clean Navigation Tabs */}
+      {/* Top Tactical HUD Header with Clean Navigation Tabs & Notification Bell */}
       <HeaderHUD
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -296,6 +323,8 @@ export default function CommandCenterPage() {
         selectedModel={selectedModel}
         account={account}
         onOpenConnectModal={() => setIsConnectModalOpen(true)}
+        unreadNotificationsCount={unreadAlertsCount}
+        onToggleNotifications={() => setIsNotificationOpen((prev) => !prev)}
       />
 
       <main
@@ -308,21 +337,25 @@ export default function CommandCenterPage() {
         {/* Compact Telemetry & Status Ribbon */}
         <KpiTelemetry
           telemetry={telemetry}
-          totalAppsCount={apps.length}
-          onlineAppsCount={onlineAppsCount}
-          overallGoalProgress={overallGoalProgress}
+          totalAppsCount={tasks.length}
+          onlineAppsCount={completedTasksCount}
+          overallGoalProgress={overallTaskProgress}
         />
 
-        {/* TAB WORKSPACE 0: LANDING PAGE C2 OVERVIEW (Hero 3D HoloSphere & Large KPI Cards) */}
+        {/* WORKBENCH 0: LANDING PAGE C2 OVERVIEW & CAPABILITY LAUNCHPAD */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fadeIn">
             <TacticalDashboard
               telemetry={telemetry}
               account={account}
               calendarEvents={calendarEvents}
+              tasks={tasks}
+              emails={emails}
               driveFiles={driveFiles}
               models={ollamaModels}
               selectedModel={selectedModel}
+              operationalMode={operationalMode}
+              onSetOperationalMode={setOperationalMode}
               onNavigateTab={setActiveTab}
               onOpenAiChat={() => setIsAiOpen(true)}
               onTriggerAnalysis={handleTriggerAnalysis}
@@ -331,7 +364,49 @@ export default function CommandCenterPage() {
           </div>
         )}
 
-        {/* TAB WORKSPACE 1: GOOGLE WORKSPACE */}
+        {/* WORKBENCH 1: INTERACTIVE EMAIL INBOX & GEMINI AI RESPONSE STUDIO */}
+        {activeTab === 'inbox' && (
+          <div className="space-y-6 animate-fadeIn">
+            <InteractiveInboxDeck
+              defaultAccountFilter={
+                operationalMode === 'defense-c2'
+                  ? 'eighty7supreme@gmail.com'
+                  : operationalMode === 'enterprise'
+                  ? 'josh@symbrook.com'
+                  : 'all'
+              }
+            />
+          </div>
+        )}
+
+        {/* WORKBENCH 2: INTERACTIVE VISUAL CALENDAR & MISSION SCHEDULER */}
+        {activeTab === 'calendar' && (
+          <div className="space-y-6 animate-fadeIn">
+            <InteractiveCalendarOps
+              events={calendarEvents}
+              onAddEvent={handleAddEvent}
+              onDeleteEvent={handleDeleteEvent}
+              onTriggerScheduleAnalysis={() => handleTriggerAnalysis('calendar')}
+              isAnalyzing={isAnalyzing}
+              onRefresh={fetchGoogleData}
+            />
+          </div>
+        )}
+
+        {/* WORKBENCH 3: ACTIONABLE MISSION TASKS & OBJECTIVES BOARD */}
+        {activeTab === 'tasks' && (
+          <div className="space-y-6 animate-fadeIn">
+            <MissionTasksBoard
+              tasks={tasks}
+              onAddTask={handleAddTask}
+              onToggleTask={handleToggleTask}
+              onDeleteTask={handleDeleteTask}
+              onDecomposeTaskWithAi={handleDecomposeTaskWithAi}
+            />
+          </div>
+        )}
+
+        {/* WORKBENCH 4: GOOGLE WORKSPACE DRIVE & ASSET REPOSITORY */}
         {activeTab === 'workspace' && (
           <div className="space-y-6 animate-fadeIn">
             <GoogleWorkspaceHub
@@ -339,8 +414,8 @@ export default function CommandCenterPage() {
               tasks={tasks}
               alerts={alerts}
               account={account}
-              onAddTask={handleAddTask}
-              onAddEvent={handleAddEvent}
+              onAddTask={(title) => handleAddTask(title)}
+              onAddEvent={(title, time) => handleAddEvent(title, time)}
               onDeleteEvent={handleDeleteEvent}
               onOpenConnectModal={() => setIsConnectModalOpen(true)}
               onRefreshCalendar={fetchGoogleData}
@@ -348,29 +423,7 @@ export default function CommandCenterPage() {
           </div>
         )}
 
-        {/* TAB WORKSPACE 2: APPS & RUNTIMES (WITH IN-APP WORKSPACE CAPABILITY) */}
-        {activeTab === 'apps' && (
-          <div className="space-y-6 animate-fadeIn">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-mono font-bold text-base text-white">MANAGED APPLICATIONS &amp; RUNTIMES</h2>
-                <p className="text-xs text-c2-textMuted font-mono">
-                  Supervise local microservices, Docker workloads, and detected Chrome web apps with native in-app view
-                </p>
-              </div>
-            </div>
-
-            <AppGrid
-              apps={apps}
-              onRefresh={fetchApps}
-              onOpenAddModal={() => setIsAddAppOpen(true)}
-              isLoading={isLoadingApps}
-              onOpenInApp={(app) => setActiveEmbeddedApp(app)}
-            />
-          </div>
-        )}
-
-        {/* TAB WORKSPACE 3: AI COGNITION & MODELS CATALOG */}
+        {/* WORKBENCH 5: AI COGNITION & MULTI-MODEL ORCHESTRATION */}
         {activeTab === 'cognition' && (
           <div className="space-y-6 animate-fadeIn">
             {/* Top Operational Status Banner */}
@@ -555,34 +608,13 @@ export default function CommandCenterPage() {
           </div>
         )}
 
-        {/* TAB WORKSPACE 4: PEN-TEST & SECURITY POSTURE */}
+        {/* WORKBENCH 6: PEN-TEST & ZERO-TRUST SECURITY POSTURE */}
         {activeTab === 'security' && (
           <div className="space-y-6 animate-fadeIn">
             <PenTestSecurityPanel
               telemetry={telemetry}
               onTriggerPenTest={() => handleTriggerAnalysis('security')}
               isAnalyzing={isAnalyzing}
-            />
-          </div>
-        )}
-
-        {/* TAB WORKSPACE 5: MISSION GOALS */}
-        {activeTab === 'goals' && (
-          <div className="space-y-6 animate-fadeIn">
-            <GoalTracker
-              goals={goals}
-              onToggleMilestone={handleToggleMilestone}
-            />
-          </div>
-        )}
-
-        {/* TAB WORKSPACE 6: DOCKER CLUSTER */}
-        {activeTab === 'docker' && (
-          <div className="space-y-6 animate-fadeIn">
-            <DockerManager
-              containers={dockerData.containers}
-              dockerRunning={dockerData.dockerRunning}
-              onRefresh={fetchDocker}
             />
           </div>
         )}
@@ -608,19 +640,15 @@ export default function CommandCenterPage() {
         isLoading={isAnalyzing}
       />
 
-      {/* Embedded In-App Workspace for Running Applications Inside NEXUS-C2 */}
-      <EmbeddedAppWorkspace
-        app={activeEmbeddedApp}
-        onClose={() => setActiveEmbeddedApp(null)}
+      {/* Tactical Notifications & Event Triggers Center */}
+      <TacticalNotificationCenter
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
         calendarEvents={calendarEvents}
-        driveFiles={driveFiles}
-      />
-
-      {/* Register Custom App Modal */}
-      <AddAppModal
-        isOpen={isAddAppOpen}
-        onClose={() => setIsAddAppOpen(false)}
-        onAppAdded={fetchApps}
+        tasks={tasks}
+        emails={emails}
+        onNavigateTab={setActiveTab}
+        onOpenAiChat={() => setIsAiOpen(true)}
       />
 
       {/* Connect Google Account Modal */}
