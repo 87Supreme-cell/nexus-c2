@@ -155,8 +155,18 @@ export default function CommandCenterPage() {
     }
   };
 
-  // Initial Data Load
+  // Initial Data Load & Tab URL routing
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      let tabParam = params.get('tab');
+      if (tabParam === 'drive') tabParam = 'workspace';
+      if (tabParam === 'pentest') tabParam = 'security';
+      if (tabParam && ['dashboard', 'inbox', 'calendar', 'tasks', 'workspace', 'cognition', 'security'].includes(tabParam)) {
+        setActiveTab(tabParam as TabSpace);
+      }
+    }
+
     fetchTelemetry();
     fetchOllama();
     fetchGoogleData();
