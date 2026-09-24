@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --c2-bg: #06090e;
+  --c2-surface: #0b121e;
+  --c2-card: rgba(13, 19, 31, 0.75);
+}
+
+body {
+  background-color: var(--c2-bg);
+  color: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Tactical Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #06090e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1a2638;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff;
+}
+
+/* Grid Matrix Background Effect */
+.bg-tactical-grid {
+  background-image: 
+    linear-gradient(to right, rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.bg-glass-grid {
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(157, 78, 221, 0.05) 0%, transparent 60%),
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
+}
+
+.bg-google-grid {
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(0, 255, 157, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 90% 80%, rgba(0, 240, 255, 0.04) 0%, transparent 50%);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease-out forwards;
+}
