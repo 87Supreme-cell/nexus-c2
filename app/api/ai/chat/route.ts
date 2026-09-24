@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     // 1. GOOGLE GEMINI CLOUD (OAUTH OR API KEY)
     // ==========================================
     if (isGeminiSelected) {
-      const selectedGeminiModel = model && model.startsWith('gemini') ? model : 'gemini-1.5-flash';
+      const selectedGeminiModel = model && model.startsWith('gemini') ? model : 'gemini-3.8-flash';
       
       // Check for OAuth Access Token (passed or stored)
       const validOAuthToken = oauthAccessToken || (await getValidAccessToken());

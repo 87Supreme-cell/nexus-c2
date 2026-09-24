@@ -263,10 +263,14 @@ export const AiTacticalConsole: React.FC<AiTacticalConsoleProps> = ({
             className="flex-1 bg-c2-bg border border-c2-border rounded px-2.5 py-1 text-[11px] text-c2-cyan font-mono focus:outline-none focus:border-c2-cyan truncate"
           >
             {/* GOOGLE GEMINI CLOUD (OAUTH) */}
-            <optgroup label="── GOOGLE GEMINI (OAUTH CLOUD) ──">
-              <option value="gemini-1.5-flash">Google Gemini 1.5 Flash (OAuth)</option>
-              <option value="gemini-1.5-pro">Google Gemini 1.5 Pro (OAuth)</option>
-              <option value="gemini-2.0-flash">Google Gemini 2.0 Flash (OAuth)</option>
+            <optgroup label="── GOOGLE GEMINI (NEXT-GEN OAUTH) ──">
+              <option value="gemini-3.8-flash">Google Gemini 3.8 Flash (High Speed & Reasoning)</option>
+              <option value="gemini-3.5-flash">Google Gemini 3.5 Flash</option>
+              <option value="gemini-3-flash">Google Gemini 3.0 Flash</option>
+              <option value="gemini-2.5-flash">Google Gemini 2.5 Flash</option>
+              <option value="gemini-2.0-flash">Google Gemini 2.0 Flash</option>
+              <option value="gemini-3.8-pro">Google Gemini 3.8 Pro</option>
+              <option value="gemini-1.5-flash">Google Gemini 1.5 Flash (Legacy)</option>
             </optgroup>
 
             {/* OLLAMA RUNTIMES */}
